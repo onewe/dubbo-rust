@@ -1,0 +1,11 @@
+[package]
+name = "nacos-extension"
+version = "0.2.0"
+edition = "2021"
+license = "Apache-2.0"
+
+[dependencies]
+dubbo-extension={path = "../extension/", version = "0.2.0"}
+
+[lib]
+crate-type = ["dylib"]

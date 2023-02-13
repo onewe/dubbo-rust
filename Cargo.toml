@@ -10,5 +10,6 @@ members = [
   "dubbo",
   "examples/echo",
   "examples/greeter",
-  "dubbo-build"
+  "dubbo-build",
+  "extension","nacos-extension","extension-loader"
 ]
