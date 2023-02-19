@@ -19,18 +19,17 @@
 pub mod memory_registry;
 pub mod protocol;
 
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc};
 
 use crate::common::url::Url;
 
+pub type RegistryListener = Arc<dyn NotifyListener + Send + Sync>;
 pub trait Registry {
-    type NotifyListener;
-
     fn register(&mut self, url: Url) -> Result<(), crate::StdError>;
     fn unregister(&mut self, url: Url) -> Result<(), crate::StdError>;
 
-    fn subscribe(&self, url: Url, listener: Self::NotifyListener) -> Result<(), crate::StdError>;
-    fn unsubscribe(&self, url: Url, listener: Self::NotifyListener) -> Result<(), crate::StdError>;
+    fn subscribe(&self, url: Url, listener: RegistryListener) -> Result<(), crate::StdError>;
+    fn unsubscribe(&self, url: Url, listener: RegistryListener) -> Result<(), crate::StdError>;
 }
 
 pub trait NotifyListener {
@@ -44,12 +43,11 @@ pub struct ServiceEvent {
     pub service: Vec<Url>,
 }
 
-pub type BoxRegistry =
-    Box<dyn Registry<NotifyListener = memory_registry::MemoryNotifyListener> + Send + Sync>;
+pub type BoxRegistry = Box<dyn Registry + Send + Sync>;
 
 #[derive(Default)]
 pub struct RegistryWrapper {
-    pub registry: Option<Box<dyn Registry<NotifyListener = memory_registry::MemoryNotifyListener>>>,
+    pub registry: Option<Box<dyn Registry>>,
 }
 
 impl Clone for RegistryWrapper {

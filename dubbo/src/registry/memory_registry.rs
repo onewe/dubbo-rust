@@ -23,7 +23,7 @@ use std::{
 
 use crate::common::url::Url;
 
-use super::{NotifyListener, Registry};
+use super::{NotifyListener, Registry, RegistryListener};
 
 // 从url中获取服务注册的元数据
 /// rawURL = fmt.Sprintf("%s://%s%s?%s", c.Protocol, host, c.Path, s)
@@ -45,8 +45,6 @@ impl MemoryRegistry {
 }
 
 impl Registry for MemoryRegistry {
-    type NotifyListener = MemoryNotifyListener;
-
     fn register(&mut self, mut url: crate::common::url::Url) -> Result<(), crate::StdError> {
         // define provider label: ${registry.group}/${service_name}/provider
         let registry_group = match url.get_param(REGISTRY_GROUP_KEY.to_string()) {
@@ -89,7 +87,7 @@ impl Registry for MemoryRegistry {
     fn subscribe(
         &self,
         url: crate::common::url::Url,
-        listener: Self::NotifyListener,
+        listener: RegistryListener,
     ) -> Result<(), crate::StdError> {
         todo!()
     }
@@ -97,7 +95,7 @@ impl Registry for MemoryRegistry {
     fn unsubscribe(
         &self,
         url: crate::common::url::Url,
-        listener: Self::NotifyListener,
+        listener: RegistryListener,
     ) -> Result<(), crate::StdError> {
         todo!()
     }

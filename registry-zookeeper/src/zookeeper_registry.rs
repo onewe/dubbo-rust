@@ -19,7 +19,7 @@
 
 use dubbo::{
     common::url::Url,
-    registry::{memory_registry::MemoryNotifyListener, NotifyListener, Registry, ServiceEvent},
+    registry::{NotifyListener, Registry, RegistryListener, ServiceEvent},
     StdError,
 };
 use serde::{Deserialize, Serialize};
@@ -50,7 +50,7 @@ pub struct ZookeeperRegistry {
     root_path: String,
     zk_client: Arc<ZooKeeper>,
 
-    listeners: RwLock<HashMap<String, Arc<<ZookeeperRegistry as Registry>::NotifyListener>>>,
+    listeners: RwLock<HashMap<String, RegistryListener>>,
 }
 
 pub struct MyNotifyListener {}
@@ -102,16 +102,15 @@ impl ZookeeperRegistry {
         &self,
         path: String,
         service_name: String,
-        listener: Arc<<ZookeeperRegistry as Registry>::NotifyListener>,
+        listener: RegistryListener,
     ) -> ServiceInstancesChangedListener {
         let mut service_names = HashSet::new();
         service_names.insert(service_name.clone());
         return ServiceInstancesChangedListener {
             zk_client: Arc::clone(&self.zk_client),
             path: path,
-
             service_name: service_name.clone(),
-            listener: listener,
+            listener,
         };
     }
 
@@ -130,8 +129,6 @@ impl ZookeeperRegistry {
 }
 
 impl Registry for ZookeeperRegistry {
-    type NotifyListener = MemoryNotifyListener;
-
     fn register(&mut self, url: Url) -> Result<(), StdError> {
         todo!();
     }
@@ -140,7 +137,7 @@ impl Registry for ZookeeperRegistry {
         todo!();
     }
 
-    fn subscribe(&self, url: Url, listener: Self::NotifyListener) -> Result<(), StdError> {
+    fn subscribe(&self, url: Url, listener: RegistryListener) -> Result<(), StdError> {
         let binding = url.get_service_name();
         let service_name = binding.get(0).unwrap();
         let app_name = self.get_app_name(service_name.clone());
@@ -149,17 +146,13 @@ impl Registry for ZookeeperRegistry {
             return Ok(());
         }
 
-        let arc_listener = Arc::new(listener);
         self.listeners
             .write()
             .unwrap()
-            .insert(service_name.to_string(), Arc::clone(&arc_listener));
+            .insert(service_name.to_string(), listener.clone());
 
-        let zk_listener = self.create_listener(
-            path.clone(),
-            service_name.to_string(),
-            Arc::clone(&arc_listener),
-        );
+        let zk_listener =
+            self.create_listener(path.clone(), service_name.to_string(), listener.clone());
 
         let res = self.zk_client.get_children_w(&path, zk_listener);
         let result: Vec<Url> = res
@@ -185,7 +178,7 @@ impl Registry for ZookeeperRegistry {
             .collect();
 
         info!("notifing {}->{:?}", service_name, result);
-        arc_listener.notify(ServiceEvent {
+        listener.notify(ServiceEvent {
             key: service_name.to_string(),
             action: String::from("ADD"),
             service: result,
@@ -193,7 +186,7 @@ impl Registry for ZookeeperRegistry {
         Ok(())
     }
 
-    fn unsubscribe(&self, url: Url, listener: Self::NotifyListener) -> Result<(), StdError> {
+    fn unsubscribe(&self, url: Url, listener: RegistryListener) -> Result<(), StdError> {
         todo!()
     }
 }
@@ -203,7 +196,7 @@ pub struct ServiceInstancesChangedListener {
     path: String,
 
     service_name: String,
-    listener: Arc<MemoryNotifyListener>,
+    listener: RegistryListener,
 }
 
 impl Watcher for ServiceInstancesChangedListener {
@@ -242,7 +235,7 @@ impl Watcher for ServiceInstancesChangedListener {
                     path: path.clone(),
 
                     service_name: self.service_name.clone(),
-                    listener: Arc::clone(&self.listener),
+                    listener: self.listener.clone(),
                 },
             );
 

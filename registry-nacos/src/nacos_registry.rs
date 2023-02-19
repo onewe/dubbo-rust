@@ -23,7 +23,7 @@ use std::{
 use anyhow::anyhow;
 use dubbo::{
     common::url::Url,
-    registry::{NotifyListener, Registry, ServiceEvent},
+    registry::{NotifyListener, Registry, RegistryListener, ServiceEvent},
 };
 use nacos_sdk::api::naming::{NamingService, NamingServiceBuilder, ServiceInstance};
 use tracing::{error, info, warn};
@@ -60,7 +60,7 @@ const INNERCLASS_SYMBOL: &str = "$";
 const INNERCLASS_COMPATIBLE_SYMBOL: &str = "___";
 
 pub struct NacosRegistry {
-    nacos_naming_service: Arc<dyn NamingService>,
+    nacos_naming_service: Arc<dyn NamingService + Send + Sync + 'static>,
     listeners: Mutex<HashMap<String, HashSet<Arc<NotifyListenerWrapper>>>>,
 }
 
@@ -139,8 +139,6 @@ impl NacosRegistry {
 }
 
 impl Registry for NacosRegistry {
-    type NotifyListener = Arc<dyn NotifyListener + Sync + Send + 'static>;
-
     fn register(&mut self, url: Url) -> Result<(), dubbo::StdError> {
         let side = url.get_param(SIDE_KEY.to_owned()).unwrap_or_default();
         let register_consumer = url
@@ -205,7 +203,7 @@ impl Registry for NacosRegistry {
         Ok(())
     }
 
-    fn subscribe(&self, url: Url, listener: Self::NotifyListener) -> Result<(), dubbo::StdError> {
+    fn subscribe(&self, url: Url, listener: RegistryListener) -> Result<(), dubbo::StdError> {
         let service_name = NacosServiceName::new(&url);
         let url_str = url.to_url();
 
@@ -252,7 +250,7 @@ impl Registry for NacosRegistry {
         Ok(())
     }
 
-    fn unsubscribe(&self, url: Url, listener: Self::NotifyListener) -> Result<(), dubbo::StdError> {
+    fn unsubscribe(&self, url: Url, listener: RegistryListener) -> Result<(), dubbo::StdError> {
         let service_name = NacosServiceName::new(&url);
         let url_str = url.to_url();
         info!("unsubscribe: {}", &url_str);
