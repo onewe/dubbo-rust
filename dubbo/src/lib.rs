@@ -14,5 +14,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-mod extensions;
+mod extension;
 mod url;
+mod config;
