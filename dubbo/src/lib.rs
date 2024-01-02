@@ -18,5 +18,45 @@ mod extension;
 mod url;
 mod config;
 mod inv;
+mod param; 
 
 pub type StdError = Box<dyn std::error::Error + Send + Sync>;
+
+pub struct DubboBootstrap {
+    application_configs: Vec<config::ApplicationConfig>,
+    registry_configs: Vec<config::RegistryConfig>,
+    reference_configs: Vec<config::ReferenceConfig>,
+}
+
+impl DubboBootstrap {
+
+    pub fn new() -> Self {
+        DubboBootstrap {
+            application_configs: Vec::new(),
+            registry_configs: Vec::new(),
+            reference_configs: Vec::new(),
+        }
+    }
+
+    pub fn add_application_config(&mut self, config: config::ApplicationConfig) {
+        self.application_configs.push(config);
+    }
+
+    pub fn add_registry_config(&mut self, config: config::RegistryConfig) {
+        self.registry_configs.push(config);
+    }
+
+    pub fn add_reference_config(&mut self, config: config::ReferenceConfig) {
+        self.reference_configs.push(config);
+    }
+
+    pub async fn start(&mut self) {
+
+    }
+
+    async fn refer_services(&mut self) -> Result<(), StdError> {
+
+
+        todo!()
+    }
+}

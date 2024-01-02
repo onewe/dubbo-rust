@@ -1,160 +1,173 @@
-use crate::url::{Url, UrlParam};
+use std::{borrow::Cow, str::FromStr};
 
-pub(crate) struct RegistryConfig {
+use crate::{url::Url, param::Param, StdError};
+
+pub struct RegistryConfig {
     url: Url
 }
 
 impl RegistryConfig {
 
-    pub(crate) fn new(url: Url) -> Self {
+    pub fn new(url: Url) -> Self {
         Self {
             url
         }
     }
 
-    pub(crate) fn protocol(&self) -> &str {
+    pub fn protocol(&self) -> &str {
         self.url.protocol()
     }
 
-    pub(crate) fn host(&self) -> Option<&str> {
+    pub fn host(&self) -> Option<&str> {
         self.url.host()
     }
 
-    pub(crate) fn username(&self) -> &str {
+    pub fn username(&self) -> &str {
         self.url.username()
     }
 
-    pub(crate) fn password(&self) -> Option<&str> {
+    pub fn password(&self) -> Option<&str> {
         self.url.password()
     }
 
-    pub(crate) fn port(&self) -> Option<u16> {
+    pub fn port(&self) -> Option<u16> {
         self.url.port()
     }
 
-    pub(crate) fn path(&self) -> &str {
+    pub fn path(&self) -> &str {
         self.url.path()
     }
 
-    pub(crate) fn query<T: UrlParam>(&self) -> Option<T> {
+    pub fn query<T: Param>(&self) -> Option<T> {
         self.url.query()
     }
 
-    pub(crate) fn set_protocol(&mut self, protocol: &str) {
+    pub fn set_protocol(&mut self, protocol: &str) {
         self.url.set_protocol(protocol);
     }
 
 
-    pub(crate) fn set_host(&mut self, host: &str) {
+    pub fn set_host(&mut self, host: &str) {
         self.url.set_host(host);
     }
 
-    pub(crate) fn set_port(&mut self, port: u16) {
+    pub fn set_port(&mut self, port: u16) {
         self.url.set_port(port);
     }
 
-    pub(crate) fn set_username(&mut self, username: &str) {
+    pub fn set_username(&mut self, username: &str) {
         self.url.set_username(username);
     }
 
-    pub(crate) fn set_password(&mut self, password: &str) {
+    pub fn set_password(&mut self, password: &str) {
         self.url.set_password(password);
     }
 
-    pub(crate) fn set_path(&mut self, path: &str) {
+    pub fn set_path(&mut self, path: &str) {
         self.url.set_path(path);
     }
 
-    pub(crate) fn add_query_param<T: UrlParam>(&mut self, param: &T) {
+    pub fn add_query_param<T: Param>(&mut self, param: &T) {
         self.url.add_query_param(param);
     }
 
 }
 
 
-pub(crate) struct UseAsConfigCenter(bool);
+pub struct UseAsConfigCenter(bool);
 
-impl UrlParam for UseAsConfigCenter {
+impl Param for UseAsConfigCenter {
 
-    fn key() -> &'static str {
+    type TargetType = bool;
+
+    fn name() -> &'static str {
         "useAsConfigCenter"
     }
 
-    type ParamType = bool;
 
-    fn value(&self) -> Self::ParamType {
+    fn value(&self) -> Self::TargetType {
         self.0
     }
 
-    fn value_to_string(&self) -> &str {
+    fn as_str(&self) -> Cow<'static, str> {
         match self.0 {
-            true => "true",
-            false => "false"
+            true => Cow::Borrowed("true"),
+            false => Cow::Borrowed("false")
         }
     }
 }
 
-impl From<String> for UseAsConfigCenter {
+impl FromStr for UseAsConfigCenter {
 
-    fn from(s: String) -> Self {
-        Self(s.parse::<bool>().unwrap())
+    type Err = StdError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let enable = s.parse::<bool>()?;
+        Ok(Self(enable))
     }
 }
 
-pub(crate) struct UseAsMetadataCenter(bool);
+pub struct UseAsMetadataCenter(bool);
 
-impl UrlParam for UseAsMetadataCenter {
+impl Param for UseAsMetadataCenter {
 
-    fn key() -> &'static str {
+    type TargetType = bool;
+
+    fn name() -> &'static str {
         "useAsMetadataCenter"
     }
 
-    type ParamType = bool;
-
-    fn value(&self) -> Self::ParamType {
+    fn value(&self) -> Self::TargetType {
         self.0
     }
 
-    fn value_to_string(&self) -> &str {
+    fn as_str(&self) -> Cow<'static, str> {
         match self.0 {
-            true => "true",
-            false => "false"
+            true => Cow::Borrowed("true"),
+            false => Cow::Borrowed("false")
         }
     }
 }
 
-impl From<String> for UseAsMetadataCenter {
+impl FromStr for UseAsMetadataCenter {
 
-    fn from(s: String) -> Self {
-        Self(s.parse::<bool>().unwrap())
+    type Err = StdError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let enable = s.parse::<bool>()?;
+        Ok(Self(enable))
     }
 }
 
-pub(crate) struct EnableEmptyProtection(bool);
+pub struct EnableEmptyProtection(bool);
 
-impl UrlParam for EnableEmptyProtection {
+impl Param for EnableEmptyProtection {
 
-    fn key() -> &'static str {
+    type TargetType = bool;
+
+    fn name() -> &'static str {
         "enableEmptyProtection"
     }
 
-    type ParamType = bool;
 
-    fn value(&self) -> Self::ParamType {
+    fn value(&self) -> Self::TargetType {
         self.0
     }
 
-    fn value_to_string(&self) -> &str {
+    fn as_str(&self) -> Cow<'static, str> {
         match self.0 {
-            true => "true",
-            false => "false"
+            true => Cow::Borrowed("true"),
+            false => Cow::Borrowed("false")
         }
     }
 }
 
-impl From<String> for EnableEmptyProtection {
+impl FromStr for EnableEmptyProtection {
 
-    fn from(s: String) -> Self {
-        Self(s.parse::<bool>().unwrap())
+    type Err = StdError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let enable = s.parse::<bool>()?;
+        Ok(Self(enable))
     }
 }

@@ -1,7 +1,7 @@
 use super::argument_config::ArgumentConfig;
 
 #[derive(Default, Debug)]
-pub(crate) struct MethodConfig {
+pub struct MethodConfig {
     
     name: String,
     
@@ -10,30 +10,30 @@ pub(crate) struct MethodConfig {
 
 impl MethodConfig {
 
-    pub(crate) fn new(name: String, arguments: Vec<ArgumentConfig>) -> Self {
+    pub fn new(name: String, arguments: Vec<ArgumentConfig>) -> Self {
         Self {
             name,
             arguments,
         }
     }
 
-    pub(crate) fn name(&self) -> &str {
+    pub fn name(&self) -> &str {
         &self.name
     }
 
-    pub(crate) fn arguments(&self) -> &Vec<ArgumentConfig> {
+    pub fn arguments(&self) -> &Vec<ArgumentConfig> {
         &self.arguments
     }
 
-    pub(crate) fn name_mut(&mut self) -> &mut str {
+    pub fn name_mut(&mut self) -> &mut str {
         &mut self.name
     }
 
-    pub(crate) fn arguments_mut(&mut self) -> &mut Vec<ArgumentConfig> {
+    pub fn arguments_mut(&mut self) -> &mut Vec<ArgumentConfig> {
         &mut self.arguments
     }
 
-    pub(crate) fn add_argument(&mut self, argument: ArgumentConfig) {
+    pub fn add_argument(&mut self, argument: ArgumentConfig) {
         self.arguments.push(argument);
     }
 }
