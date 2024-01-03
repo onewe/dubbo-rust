@@ -67,7 +67,7 @@ impl RegistryConfig {
         self.url.set_path(path);
     }
 
-    pub fn add_query_param<T: Param>(&mut self, param: &T) {
+    pub fn add_query_param<T: Param>(&mut self, param: T) {
         self.url.add_query_param(param);
     }
 

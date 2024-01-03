@@ -71,7 +71,7 @@ impl Url {
         let _ = self.inner.set_path(path);
     }
 
-    pub fn add_query_param<T: Param>(&mut self, param: &T) {
+    pub fn add_query_param<T: Param>(&mut self, param: T) {
         let mut pairs = self.inner.query_pairs_mut();
         pairs.append_pair(T::name(), &param.as_str());
     }
