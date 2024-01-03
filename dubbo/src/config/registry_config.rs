@@ -1,6 +1,4 @@
-use std::{borrow::Cow, str::FromStr};
-
-use crate::{url::Url, param::Param, StdError};
+use crate::{url::Url, param::{Param, Registry}};
 
 pub struct RegistryConfig {
     url: Url
@@ -71,103 +69,20 @@ impl RegistryConfig {
         self.url.add_query_param(param);
     }
 
-}
+    pub fn to_url(&self) -> Url {
+        const REGISTRY_PROTOCOL: &str = "registry";
 
+        let protocol = self.protocol();
 
-pub struct UseAsConfigCenter(bool);
+        let mut url = self.url.clone();
+        url.set_protocol(REGISTRY_PROTOCOL);
 
-impl Param for UseAsConfigCenter {
-
-    type TargetType = bool;
-
-    fn name() -> &'static str {
-        "useAsConfigCenter"
-    }
-
-
-    fn value(&self) -> Self::TargetType {
-        self.0
-    }
-
-    fn as_str(&self) -> Cow<'static, str> {
-        match self.0 {
-            true => Cow::Borrowed("true"),
-            false => Cow::Borrowed("false")
+        match protocol.parse() {
+            Ok(registry) => url.add_query_param::<Registry>(registry),
+            Err(_) => {}
         }
-    }
-}
 
-impl FromStr for UseAsConfigCenter {
-
-    type Err = StdError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let enable = s.parse::<bool>()?;
-        Ok(Self(enable))
-    }
-}
-
-pub struct UseAsMetadataCenter(bool);
-
-impl Param for UseAsMetadataCenter {
-
-    type TargetType = bool;
-
-    fn name() -> &'static str {
-        "useAsMetadataCenter"
+        url
     }
 
-    fn value(&self) -> Self::TargetType {
-        self.0
-    }
-
-    fn as_str(&self) -> Cow<'static, str> {
-        match self.0 {
-            true => Cow::Borrowed("true"),
-            false => Cow::Borrowed("false")
-        }
-    }
-}
-
-impl FromStr for UseAsMetadataCenter {
-
-    type Err = StdError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let enable = s.parse::<bool>()?;
-        Ok(Self(enable))
-    }
-}
-
-pub struct EnableEmptyProtection(bool);
-
-impl Param for EnableEmptyProtection {
-
-    type TargetType = bool;
-
-    fn name() -> &'static str {
-        "enableEmptyProtection"
-    }
-
-
-    fn value(&self) -> Self::TargetType {
-        self.0
-    }
-
-    fn as_str(&self) -> Cow<'static, str> {
-        match self.0 {
-            true => Cow::Borrowed("true"),
-            false => Cow::Borrowed("false")
-        }
-    }
-}
-
-impl FromStr for EnableEmptyProtection {
-
-    type Err = StdError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let enable = s.parse::<bool>()?;
-        Ok(Self(enable))
-    }
 }

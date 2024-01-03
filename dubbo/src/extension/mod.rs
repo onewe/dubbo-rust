@@ -5,7 +5,7 @@ use tower::discover::Change;
 use crate::{url::Url, StdError, inv::Invoker};
 
 #[derive(Default)]
-pub(crate) struct ExtensionDirectory {
+pub struct ExtensionDirectory {
 
     protocol_extension_loaders: Vec<Box<dyn ProtocolExtensionLoader>>,
 
@@ -23,7 +23,7 @@ pub(crate) struct ExtensionDirectory {
 
 impl ExtensionDirectory {
 
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             protocol_extension_loaders: Vec::new(),
             registry_extension_loaders: Vec::new(),
@@ -38,34 +38,34 @@ impl ExtensionDirectory {
 
 impl ExtensionDirectory {
 
-    pub(crate) fn add_protocol_extension_loader(&mut self, loader: Box<dyn ProtocolExtensionLoader>) {
+    pub fn add_protocol_extension_loader(&mut self, loader: Box<dyn ProtocolExtensionLoader>) {
         self.protocol_extension_loaders.push(loader);
     }
 
-    pub(crate) fn add_registry_extension_loader(&mut self, loader: Box<dyn RegistryExtensionLoader>) {
+    pub fn add_registry_extension_loader(&mut self, loader: Box<dyn RegistryExtensionLoader>) {
         self.registry_extension_loaders.push(loader);
     }
 
-    pub(crate) fn add_cluster_extension_loader(&mut self, loader: Box<dyn ClusterExtensionLoader>) {
+    pub fn add_cluster_extension_loader(&mut self, loader: Box<dyn ClusterExtensionLoader>) {
         self.cluster_extension_loaders.push(loader);
     }
 
-    pub(crate) fn add_directory_extension_loader(&mut self, loader: Box<dyn DirectoryExtensionLoader>) {
+    pub fn add_directory_extension_loader(&mut self, loader: Box<dyn DirectoryExtensionLoader>) {
         self.directory_extension_loaders.push(loader);
     }
 
-    pub(crate) fn add_load_balance_extension_loader(&mut self, loader: Box<dyn LoadBalanceExtensionLoader>) {
+    pub fn add_load_balance_extension_loader(&mut self, loader: Box<dyn LoadBalanceExtensionLoader>) {
         self.load_balance_extension_loaders.push(loader);
     }
 
-    pub(crate) fn add_router_extension_loader(&mut self, loader: Box<dyn RouterExtensionLoader>) {
+    pub fn add_router_extension_loader(&mut self, loader: Box<dyn RouterExtensionLoader>) {
         self.router_extension_loaders.push(loader);
     }
 
 }
 
 
-pub(crate) trait ExtensionLoader {
+pub trait ExtensionLoader {
 
     type Extension;
 
@@ -78,7 +78,7 @@ pub(crate) trait ExtensionLoader {
 pub type DiscoverStream = Receiver<Result<Change<String, ()>, StdError>>;
 
 #[async_trait]
-pub(crate) trait Registry {
+pub trait Registry {
 
     async fn register(&mut self, url: &Url) -> Result<(), StdError>;
 
@@ -91,7 +91,7 @@ pub(crate) trait Registry {
 }
 
 #[async_trait]
-pub(crate) trait Protocol {
+pub trait Protocol {
     
     async fn export(&mut self, url: &Url) -> Result<(), StdError>;
 
@@ -100,27 +100,27 @@ pub(crate) trait Protocol {
 
 
 #[async_trait]
-pub(crate) trait Cluster {
+pub trait Cluster {
 
     async fn join(&mut self, url: &Url, invokers: Vec<Box<dyn Invoker>>) -> Result<Box<dyn Invoker>, StdError>;
     
 }
 
 #[async_trait]
-pub(crate) trait Directory {
+pub trait Directory {
     
     async fn list(&mut self) -> Result<Vec<Box<dyn Invoker>>, StdError>;
 }
 
 #[async_trait]
-pub(crate) trait LoadBalance {
+pub trait LoadBalance {
 
     async fn select(&mut self, invokes: Vec<Box<dyn Invoker>>) -> Result<Box<dyn Invoker>, StdError>;
     
 }
 
 #[async_trait]
-pub(crate) trait Router {
+pub trait Router {
     
     async fn route(&mut self, invokes: Vec<Box<dyn Invoker>>) -> Result<Vec<Box<dyn Invoker>>, StdError>;
 }
@@ -128,7 +128,7 @@ pub(crate) trait Router {
 macro_rules! extension_loader {
     ($name:ident<$extension_type:tt>) => {
         #[async_trait::async_trait]
-        pub(crate) trait $name {
+        pub trait $name {
             async fn support(&self, url: &Url) -> bool;
 
             async fn load(&mut self, url: &Url) -> Result<&mut dyn $extension_type, StdError>;

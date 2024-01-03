@@ -1,8 +1,9 @@
-use std::str::FromStr;
+use std::{str::FromStr, fmt::{Debug, Formatter}};
+use core::fmt::Display;
 
 use crate::param::Param;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
  pub struct Url {
     inner: url::Url,
 }
@@ -76,6 +77,10 @@ impl Url {
         pairs.append_pair(T::name(), &param.as_str());
     }
 
+    pub fn as_str(&self) -> &str {
+        self.inner.as_str()
+    }
+
 }
 
 
@@ -88,5 +93,28 @@ impl FromStr for Url {
         Ok(Url {
             inner: url::Url::parse(s)?,
         })
+    }
+}
+
+impl Display for Url {
+
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(&self.inner, f)
+    }
+}
+
+
+impl Debug for Url {
+    
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(&self.inner, f)
+    }
+}
+
+
+impl From<Url> for String {
+    
+    fn from(url: Url) -> Self {
+        url.inner.into()
     }
 }

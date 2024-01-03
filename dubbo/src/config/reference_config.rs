@@ -1,4 +1,4 @@
-use crate::{url::Url, param::{Interface, Side, Revision}};
+use crate::{url::Url, param::{Interface, Side, Revision, Methods, RegisterIp}};
 
 use super::MethodConfig;
 
@@ -76,7 +76,7 @@ impl ReferenceConfig {
 
     pub fn to_url(&self) -> Url {
 
-        const DEFAULT_PROTOCOL: &str = "dubbo-refrence";
+        const DEFAULT_PROTOCOL: &str = "dubbo-reference";
         const DEFAULT_HOST: &str = "localhost";
 
         let mut url = Url::empty();
@@ -89,18 +89,23 @@ impl ReferenceConfig {
             Err(_) => {}
         }
 
-        url.add_query_param(Side::CONSUMER);
+        url.add_query_param(Side::Consumer);
 
 
         match self.version.parse() {
-            Ok(version) => url.add_query_param::<Revision>(version),
+            Ok(revision) => url.add_query_param::<Revision>(revision),
             Err(_) => {}
         }
 
+        if self.methods.is_empty() {
+            url.add_query_param(Methods::Any)
+        } else {
+            url.add_query_param(Methods::Methods(self.methods.iter().map(|m| m.name().to_owned()).collect()))
+        }
 
-        
+        url.add_query_param(RegisterIp::LocalHost);
 
-        todo!()
+        url
     }
 
 }

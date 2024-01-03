@@ -1,3 +1,5 @@
+use crate::param::ReferenceUrl;
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -23,6 +25,7 @@ mod param;
 pub type StdError = Box<dyn std::error::Error + Send + Sync>;
 
 pub struct DubboBootstrap {
+    extension_directory: extension::ExtensionDirectory,
     application_configs: Vec<config::ApplicationConfig>,
     registry_configs: Vec<config::RegistryConfig>,
     reference_configs: Vec<config::ReferenceConfig>,
@@ -35,7 +38,32 @@ impl DubboBootstrap {
             application_configs: Vec::new(),
             registry_configs: Vec::new(),
             reference_configs: Vec::new(),
+            extension_directory: extension::ExtensionDirectory::new(),
         }
+    }
+
+    pub fn add_protocol_extension_loader(&mut self, loader: Box<dyn extension::ProtocolExtensionLoader>) {
+        self.extension_directory.add_protocol_extension_loader(loader);
+    }
+
+    pub fn add_registry_extension_loader(&mut self, loader: Box<dyn extension::RegistryExtensionLoader>) {
+        self.extension_directory.add_registry_extension_loader(loader);
+    }
+
+    pub fn add_cluster_extension_loader(&mut self, loader: Box<dyn extension::ClusterExtensionLoader>) {
+        self.extension_directory.add_cluster_extension_loader(loader);
+    }
+
+    pub fn add_directory_extension_loader(&mut self, loader: Box<dyn extension::DirectoryExtensionLoader>) {
+        self.extension_directory.add_directory_extension_loader(loader);
+    }
+
+    pub fn add_load_balance_extension_loader(&mut self, loader: Box<dyn extension::LoadBalanceExtensionLoader>) {
+        self.extension_directory.add_load_balance_extension_loader(loader);
+    }
+
+    pub fn add_router_extension_loader(&mut self, loader: Box<dyn extension::RouterExtensionLoader>) {
+        self.extension_directory.add_router_extension_loader(loader);
     }
 
     pub fn add_application_config(&mut self, config: config::ApplicationConfig) {
@@ -55,8 +83,7 @@ impl DubboBootstrap {
     }
 
     async fn refer_services(&mut self) -> Result<(), StdError> {
-
-
+     
         todo!()
     }
 }
