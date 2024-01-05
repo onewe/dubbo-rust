@@ -13,8 +13,6 @@ pub struct ExtensionDirectory {
 
     cluster_extension_loaders: Vec<Box<dyn ClusterExtensionLoader>>,
 
-    directory_extension_loaders: Vec<Box<dyn DirectoryExtensionLoader>>,
-
     load_balance_extension_loaders: Vec<Box<dyn LoadBalanceExtensionLoader>>,
 
     router_extension_loaders: Vec<Box<dyn RouterExtensionLoader>>,
@@ -28,7 +26,6 @@ impl ExtensionDirectory {
             protocol_extension_loaders: Vec::new(),
             registry_extension_loaders: Vec::new(),
             cluster_extension_loaders: Vec::new(),
-            directory_extension_loaders: Vec::new(),
             load_balance_extension_loaders: Vec::new(),
             router_extension_loaders: Vec::new(),
         }
@@ -50,10 +47,6 @@ impl ExtensionDirectory {
         self.cluster_extension_loaders.push(loader);
     }
 
-    pub fn add_directory_extension_loader(&mut self, loader: Box<dyn DirectoryExtensionLoader>) {
-        self.directory_extension_loaders.push(loader);
-    }
-
     pub fn add_load_balance_extension_loader(&mut self, loader: Box<dyn LoadBalanceExtensionLoader>) {
         self.load_balance_extension_loaders.push(loader);
     }
@@ -62,16 +55,6 @@ impl ExtensionDirectory {
         self.router_extension_loaders.push(loader);
     }
 
-}
-
-
-pub trait ExtensionLoader {
-
-    type Extension;
-
-    fn support(&self, url: &Url) -> bool;
-
-    fn load(&self, url: &Url) -> Self::Extension;
 }
 
 
@@ -102,27 +85,22 @@ pub trait Protocol {
 #[async_trait]
 pub trait Cluster {
 
-    async fn join(&mut self, url: &Url, invokers: Vec<Box<dyn Invoker>>) -> Result<Box<dyn Invoker>, StdError>;
+    async fn join(&self, url: &Url, invokers: Vec<Box<dyn Invoker>>) -> Result<Box<dyn Invoker>, StdError>;
     
 }
 
-#[async_trait]
-pub trait Directory {
-    
-    async fn list(&mut self) -> Result<Vec<Box<dyn Invoker>>, StdError>;
-}
 
 #[async_trait]
 pub trait LoadBalance {
 
-    async fn select(&mut self, invokes: Vec<Box<dyn Invoker>>) -> Result<Box<dyn Invoker>, StdError>;
+    async fn select(&self, invokes: Vec<Box<dyn Invoker>>) -> Result<Box<dyn Invoker>, StdError>;
     
 }
 
 #[async_trait]
 pub trait Router {
     
-    async fn route(&mut self, invokes: Vec<Box<dyn Invoker>>) -> Result<Vec<Box<dyn Invoker>>, StdError>;
+    async fn route(&self, invokes: Vec<Box<dyn Invoker>>) -> Result<Vec<Box<dyn Invoker>>, StdError>;
 }
 
 macro_rules! extension_loader {
@@ -142,8 +120,6 @@ extension_loader!(ProtocolExtensionLoader<Protocol>);
 extension_loader!(RegistryExtensionLoader<Registry>);
 
 extension_loader!(ClusterExtensionLoader<Cluster>);
-
-extension_loader!(DirectoryExtensionLoader<Directory>);
 
 extension_loader!(LoadBalanceExtensionLoader<LoadBalance>);
 

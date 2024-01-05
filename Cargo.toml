@@ -18,5 +18,5 @@ thiserror = "1"
 itertools = "0.12"
 bytes = "1.0"
 url = "2.5.0"
-
+tracing = "0.1.40"
 

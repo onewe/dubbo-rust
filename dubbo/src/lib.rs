@@ -21,6 +21,7 @@ mod url;
 mod config;
 mod inv;
 mod param; 
+mod directory;
 
 pub type StdError = Box<dyn std::error::Error + Send + Sync>;
 
@@ -54,10 +55,6 @@ impl DubboBootstrap {
         self.extension_directory.add_cluster_extension_loader(loader);
     }
 
-    pub fn add_directory_extension_loader(&mut self, loader: Box<dyn extension::DirectoryExtensionLoader>) {
-        self.extension_directory.add_directory_extension_loader(loader);
-    }
-
     pub fn add_load_balance_extension_loader(&mut self, loader: Box<dyn extension::LoadBalanceExtensionLoader>) {
         self.extension_directory.add_load_balance_extension_loader(loader);
     }
@@ -83,7 +80,16 @@ impl DubboBootstrap {
     }
 
     async fn refer_services(&mut self) -> Result<(), StdError> {
-     
+
+        for reference_config in self.reference_configs.iter() {
+            let reference_url = reference_config.to_url();
+
+            
+
+        }
+        
         todo!()
     }
 }
+
+

@@ -20,3 +20,4 @@ pin-project.workspace = true
 futures.workspace = true
 thiserror.workspace = true
 url.workspace = true
+tracing.workspace = true

@@ -1,9 +1,11 @@
-use std::fmt::Display;
+use std::{fmt::Display, task::{Context, Poll}};
 
 use bytes::Bytes;
 use futures::Stream;
 
 use crate::{StdError, url::Url};
+
+mod cloneable_invoker;
 
 #[derive(Default)]
 pub struct RpcInvocation {
@@ -71,19 +73,27 @@ impl RpcInvocation {
 
 pub struct RpcResponse {
     
-    data: Box<dyn Serializable>,
+    data: Box<dyn Serializable + Send + 'static>,
+}
+
+impl Display for RpcResponse {
+        
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "RpcResponse {{ data: {} }}", self.data)
+        }
+    
 }
 
 pub struct Argument {
 
     name: String,
 
-    data: Box<dyn Serializable>
+    data: Box<dyn Serializable + Send + 'static>
 }
 
 impl Argument {
     
-        pub fn new(name: String, data: Box<dyn Serializable>) -> Self {
+        pub fn new(name: String, data: Box<dyn Serializable + Send + 'static>) -> Self {
             Self {
                 name,
                 data,
@@ -116,7 +126,9 @@ pub trait Deserializable<T> {
 #[async_trait::async_trait]
 pub trait Invoker {
 
-    async fn invoke(&mut self, invocation: &RpcInvocation) -> Result<RpcResponse, StdError>;
+    fn poll_ready(&mut self,  cx: &mut Context<'_>) -> Poll<Result<(), StdError>>;
+
+    async fn invoke(&mut self, invocation: RpcInvocation) -> Result<RpcResponse, StdError>;
 
     fn url(&self) -> &Url;
     
