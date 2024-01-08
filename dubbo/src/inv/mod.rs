@@ -2,6 +2,7 @@ use std::{fmt::Display, task::{Context, Poll}};
 
 use bytes::Bytes;
 use futures::Stream;
+use thiserror::Error;
 
 use crate::{StdError, url::Url};
 
@@ -117,7 +118,6 @@ pub trait Serializable: Display {
 
 pub trait Deserializable<T> {
     
-    
     fn deserialize(&self, data: Box<dyn Stream<Item = Bytes>>) -> Result<T, StdError>;
     
 }
@@ -126,10 +126,22 @@ pub trait Deserializable<T> {
 #[async_trait::async_trait]
 pub trait Invoker {
 
-    fn poll_ready(&mut self,  cx: &mut Context<'_>) -> Poll<Result<(), StdError>>;
+    async fn poll_ready(&mut self) -> Result<(), StdError>;
 
     async fn invoke(&mut self, invocation: RpcInvocation) -> Result<RpcResponse, StdError>;
 
     fn url(&self) -> &Url;
+    
+}
+
+
+#[derive(Error, Debug)]
+#[error("invoke error: {0}")]
+pub struct InvokeError(String);
+
+impl InvokeError {   
+    pub fn new(msg: String) -> Self {
+        Self(msg)
+    }
     
 }
