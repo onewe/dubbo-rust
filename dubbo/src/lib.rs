@@ -81,13 +81,39 @@ impl DubboBootstrap {
 
     async fn refer_services(&mut self) -> Result<(), StdError> {
 
+        let mut urls = Vec::new();
+        
         for reference_config in self.reference_configs.iter() {
-            let reference_url = reference_config.to_url();
+            match reference_config.direct_url() {
+                Some(direct_url) => {
+                    urls.push(direct_url.clone())
+                },
+                None => {
+                    let reference_url = reference_config.to_url();
+                    for registry_config in  self.registry_configs.iter() {
+                        let mut registry_url = registry_config.to_url();
+                        registry_url.add_query_param(ReferenceUrl::new(reference_url.clone()));
+                        urls.push(registry_url)
+                    }
+                }
+            }
+        }
 
+        for url in urls.iter() {
             
+            let protocol_extension_loader = self.extension_directory.find_protocol_extension_loader(url).await;
+            match protocol_extension_loader {
+                None => {},
+                Some(protocol_extension_loader) => {
+                    let protocol_extension = protocol_extension_loader.load(url).await?;
+                    let invoker = protocol_extension.refer(url).await?;
+                    
+                }
+            }
 
         }
-        
+
+
         todo!()
     }
 }

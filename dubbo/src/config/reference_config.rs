@@ -13,18 +13,18 @@ pub struct ReferenceConfig {
 
     version: String,
 
-    url: Option<Url>
+    direct_url: Option<Url>
 }
 
 impl ReferenceConfig {
 
-    pub fn new(service: String, interface_name: String, methods: Vec<MethodConfig>, version: String, url: Option<Url>) -> Self {
+    pub fn new(service: String, interface_name: String, methods: Vec<MethodConfig>, version: String, direct_url: Option<Url>) -> Self {
         Self {
             service,
             interface_name,
             methods,
             version,
-            url,
+            direct_url,
         }
     }
 
@@ -44,8 +44,8 @@ impl ReferenceConfig {
         &self.version
     }
 
-    pub fn url(&self) -> Option<&Url> {
-        self.url.as_ref()
+    pub fn direct_url(&self) -> Option<&Url> {
+        self.direct_url.as_ref()
     }
 
 
@@ -69,8 +69,8 @@ impl ReferenceConfig {
         self.methods.push(method);
     }
 
-    pub fn set_url(&mut self, url: Url) {
-        self.url = Some(url);
+    pub fn set_direct_url(&mut self, direct_url: Url) {
+        self.direct_url = Some(direct_url);
     }
 
 

@@ -55,6 +55,15 @@ impl ExtensionDirectory {
         self.router_extension_loaders.push(loader);
     }
 
+    pub async fn find_protocol_extension_loader(&mut self, url: &Url) -> Option<&mut dyn ProtocolExtensionLoader> {
+        for loader in self.protocol_extension_loaders.iter_mut() {
+            if loader.support(url).await {
+               return Some(loader.as_mut());
+            }
+        }
+        None
+    }
+
 }
 
 
