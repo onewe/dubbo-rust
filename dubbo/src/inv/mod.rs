@@ -6,7 +6,7 @@ use thiserror::Error;
 
 use crate::{StdError, url::Url};
 
-mod cloneable_invoker;
+pub(crate) mod cloneable_invoker;
 
 #[derive(Default)]
 pub struct RpcInvocation {

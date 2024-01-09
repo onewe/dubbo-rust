@@ -1,5 +1,6 @@
 use async_trait::async_trait;
-use tokio::sync::mpsc::Receiver;
+use futures::Stream;
+use tokio::sync::{mpsc::Receiver, watch};
 use tower::discover::Change;
 
 use crate::{url::Url, StdError, inv::Invoker};
@@ -64,10 +65,17 @@ impl ExtensionDirectory {
         None
     }
 
+    pub async fn find_registry_extension_loader(&mut self, url: &Url) -> Option<&mut dyn RegistryExtensionLoader> {
+        for loader in self.registry_extension_loaders.iter_mut() {
+            if loader.support(url).await {
+               return Some(loader.as_mut());
+            }
+        }
+        None
+    }
+
 }
 
-
-pub type DiscoverStream = Receiver<Result<Change<String, ()>, StdError>>;
 
 #[async_trait]
 pub trait Registry {
@@ -76,9 +84,7 @@ pub trait Registry {
 
     async fn unregister(&mut self, url: &Url) -> Result<(), StdError>;
 
-    async fn subscribe(&mut self, url: &Url) -> Result<DiscoverStream, StdError>;
-
-    async fn unsubscribe(&mut self, url: &Url) -> Result<(), StdError>;
+    async fn subscribe(&mut self, url: &Url) -> Result<Box<dyn Stream<Item = Vec<String>> + Send>, StdError>;
 
 }
 
