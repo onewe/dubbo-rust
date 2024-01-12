@@ -27,8 +27,18 @@ pub mod proxy {
         Join(Url, Vec<Box<dyn Invoker + Send>>, oneshot::Sender<Result<Box<dyn Invoker + Send>, StdError>>),
     }
 
+    #[derive(Clone)]
     pub struct ClusterProxy {
         sender: tokio::sync::mpsc::Sender<ClusterOpt>,
+    }
+
+    impl ClusterProxy {
+
+        pub fn new(sender: tokio::sync::mpsc::Sender<ClusterOpt>) -> Self {
+            ClusterProxy {
+                sender,
+            }
+        }
     }
 
 

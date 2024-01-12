@@ -38,8 +38,17 @@ pub mod proxy {
         
     }
 
+    #[derive(Clone)]
     pub struct RegistryProxy {
         sender: tokio::sync::mpsc::Sender<RegistryOpt>,
+    }
+
+    impl RegistryProxy {
+        pub fn new(sender: tokio::sync::mpsc::Sender<RegistryOpt>) -> Self {
+            RegistryProxy {
+                sender,
+            }
+        }
     }
 
     #[async_trait]

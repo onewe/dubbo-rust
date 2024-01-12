@@ -29,8 +29,18 @@ pub mod proxy {
         Refer(Url, oneshot::Sender<Result<Box<dyn Invoker + Send>, StdError>>),
     }
 
+    #[derive(Clone)]
     pub struct ProtocolProxy {
         sender: tokio::sync::mpsc::Sender<ProtocolOpt>,
+    }
+
+    impl ProtocolProxy {
+
+        pub fn new(sender: tokio::sync::mpsc::Sender<ProtocolOpt>) -> Self {
+            ProtocolProxy {
+                sender,
+            }
+        }
     }
 
 

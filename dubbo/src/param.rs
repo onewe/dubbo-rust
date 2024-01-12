@@ -357,3 +357,30 @@ impl FromStr for ReferenceUrl {
         Ok(Self(url))
     }
 }
+
+pub struct Extension(String);
+
+impl Param for Extension {
+
+    type TargetType = String;
+
+    fn name() -> &'static str {
+        "extension"
+    }
+
+    fn value(&self) -> Self::TargetType {
+        self.0.clone()
+    }
+
+    fn as_str<'a>(&'a self) -> std::borrow::Cow<'a, str> {
+        Cow::Borrowed(&self.0)
+    }
+}
+
+impl FromStr for Extension {
+    type Err = StdError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Extension(s.to_owned()))
+    }
+}

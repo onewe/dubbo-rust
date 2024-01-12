@@ -8,7 +8,7 @@ use tokio::sync::{mpsc::Receiver, watch, oneshot, Notify};
 use tower::discover::Change;
 use tracing::{error, warn, debug};
 
-use crate::{url::Url, StdError, inv::Invoker};
+use crate::{url::Url, StdError, inv::Invoker, param::{Extension, Param}, extension::{protocol_extension::proxy::ProtocolOpt, registry_extension::proxy::RegistryOpt}};
 
 use self::{registry_extension::Registry, protocol_extension::Protocol, cluster_extension::Cluster, load_balance_extension::LoadBalance, router_extension::Router};
 
@@ -23,13 +23,23 @@ pub struct ExtensionDirectory {
 
     protocol_extension_loaders: HashMap<String, Box<dyn ProtocolExtensionLoader>>,
 
+    protocol_extensions: HashMap<String, protocol_extension::proxy::ProtocolProxy>,
+
     registry_extension_loaders: HashMap<String, Box<dyn RegistryExtensionLoader>>,
+
+    registry_extensions: HashMap<String, registry_extension::proxy::RegistryProxy>,
 
     cluster_extension_loaders: HashMap<String, Box<dyn ClusterExtensionLoader>>,
 
+    cluster_extensions: HashMap<String, cluster_extension::proxy::ClusterProxy>,
+
     load_balance_extension_loaders: HashMap<String, Box<dyn LoadBalanceExtensionLoader>>,
 
+    load_balance_extensions: HashMap<String, load_balance_extension::proxy::LoadBalanceProxy>,
+
     router_extension_loaders: HashMap<String, Box<dyn RouterExtensionLoader>>,
+
+    router_extensions: HashMap<String, router_extension::proxy::RouterProxy>,
 }
 
 
@@ -121,10 +131,177 @@ impl ExtensionDirectory {
         self.router_extension_loaders.remove(name);
     }
 
-    async fn load_protocol_extension(&mut self, name: &str, url: Url, tx: oneshot::Sender<protocol_extension::proxy::ProtocolProxy>) {
-        debug!("load protocol extension, name: {}, url: {}", name, url);
+    async fn load_protocol_extension(&mut self, url: Url, tx: oneshot::Sender<protocol_extension::proxy::ProtocolProxy>) {
+        debug!("load protocol extension, url: {}", url);
+        let extension = url.query::<Extension>();
+        match extension {
+            None => {
+                error!("load protocol extension error: extension not found, url: {}", url);
+            },
+            Some(extension) => {
+                let name = extension.value();
+                let extension_loader = self.protocol_extension_loaders.get_mut(&name);
+                match extension_loader {
+                    None => {
+                        error!("load protocol extension error: extension loader not found, url: {}", url);
+                    },
+                    Some(extension_loader) => {
+                        let extension_cache_key = url.to_string();
+                        let protocol_extension = self.protocol_extensions.get(&extension_cache_key);
+                        match protocol_extension {
+                            None => {
+                                match extension_loader.load(&url).await {
+                                    Ok(mut protocol_extension) => {
+                                        let (extension_opt_tx, mut extension_opt_rx) = tokio::sync::mpsc::channel(64);
+                                        tokio::spawn(async move {
+                                            while let Some(opt) = extension_opt_rx.recv().await {
+                                                match opt {
+                                                    ProtocolOpt::Export(url, callback) => {
+                                                        let export = protocol_extension.export(url).await;
+                                                        let _ = callback.send(export);
+                                                    },
+                                                    ProtocolOpt::Refer(url, callback) => {
+                                                        let invoker = protocol_extension.refer(url).await;
+                                                        let _ = callback.send(invoker);
+                                                    },
+                                                }
+                                            }
+                                            debug!("protocol extension destroy, url: {}", url);
+                                        });
+
+                                        let proxy = protocol_extension::proxy::ProtocolProxy::new(extension_opt_tx);
+                                        self.protocol_extensions.insert(extension_cache_key, proxy.clone());
+                                        let _ = tx.send(proxy);
+                                    },
+                                    Err(err) => {
+                                        error!("load protocol extension error: load extension failed, url: {}, err: {}", url, err);
+                                    },
+                                }
+                            },
+                            Some(protocol_extension) => {
+                                let _ = tx.send(protocol_extension.clone());
+                            }
+                        }
+                    }
+                }
+            }
+        }
         
+    }
+
+
+    async fn load_registry_extension(&mut self, url: Url, tx: oneshot::Sender<registry_extension::proxy::RegistryProxy>) {
+        debug!("load registry extension, url: {}", url);
+        let extension = url.query::<Extension>();
+        match extension {
+            None => {
+                error!("load registry extension error: extension not found, url: {}", url);
+            },
+            Some(extension) => {
+                let name = extension.value();
+                match self.registry_extension_loaders.get_mut(&name) {
+                    None => {
+                        error!("load registry extension error: extension loader not found, url: {}", url);
+                    },
+                    Some(extension_loader) => {
+                        let extension_cache_key = url.to_string();
+                        match self.registry_extensions.get(&extension_cache_key) {
+                            None => {
+                                match extension_loader.load(&url).await {
+                                    Ok(mut registry_extension) => {
+                                        let (extension_opt_tx, mut extension_opt_rx) = tokio::sync::mpsc::channel(64);
+                                        tokio::spawn(async move {
+                                            while let Some(opt) = extension_opt_rx.recv().await {
+                                                match opt {
+                                                    RegistryOpt::Register(url, callback) => {
+                                                        let register = registry_extension.register(url).await;
+                                                        let _ = callback.send(register);
+                                                    },
+                                                    RegistryOpt::Unregister(url, callback) => {
+                                                        let unregister = registry_extension.unregister(url).await;
+                                                        let _ = callback.send(unregister);
+                                                    },
+                                                    RegistryOpt::Subscribe(url, callback) => {
+                                                        let subscribe = registry_extension.subscribe(url).await;
+                                                        let _ = callback.send(subscribe);
+                                                    },
+                                                }
+                                            }
+                                            debug!("registry extension destroy, url: {}", url);
+                                        });
+
+                                        let proxy = registry_extension::proxy::RegistryProxy::new(extension_opt_tx);
+                                        self.registry_extensions.insert(extension_cache_key, proxy.clone());
+                                        let _ = tx.send(proxy);
+                                    },
+                                    Err(err) => {
+                                        error!("load registry extension error: load extension failed, url: {}, err: {}", url, err);
+                                    },
+                                }
+                            },
+                             Some(registry_extension) => {
+                                let _ = tx.send(registry_extension.clone());
+                             }
+                        }
+                    }
+                }
+            }
+
+        }
         
+
+    }
+
+
+    async fn load_cluster_extension(&mut self, url: Url, invokers: Vec<Box<dyn Invoker + Send>>, tx: oneshot::Sender<cluster_extension::proxy::ClusterProxy>) {
+        debug!("load cluster extension, url: {}", url);
+        let extension = url.query::<Extension>();
+        match extension {
+            None => {
+                error!("load cluster extension error: extension not found, url: {}", url);
+            },
+            Some(extension) => {
+                let name = extension.value();
+                match self.cluster_extension_loaders.get_mut(&name) {
+                    None => {
+                        error!("load cluster extension error: extension loader not found, url: {}", url);
+                    },
+                    Some(extension_loader) => {
+                        let extension_cache_key = url.to_string();
+                        match self.cluster_extensions.get(&extension_cache_key) {
+                            None => {
+                                match extension_loader.load(&url).await {
+                                    Ok(mut cluster_extension) => {
+                                        let (extension_opt_tx, mut extension_opt_rx) = tokio::sync::mpsc::channel(64);
+                                        tokio::spawn(async move {
+                                            while let Some(opt) = extension_opt_rx.recv().await {
+                                                match opt {
+                                                   cluster_extension::proxy::ClusterOpt::Join(url, invokes, callback) => {
+                                                        let join = cluster_extension.join(url, invokes).await;
+                                                        let _ = callback.send(join);
+                                                    },
+                                                }
+                                            }
+                                            debug!("cluster extension destroy, url: {}", url);
+                                        });
+
+                                        let proxy = cluster_extension::proxy::ClusterProxy::new(extension_opt_tx);
+                                        self.cluster_extensions.insert(extension_cache_key, proxy.clone());
+                                        let _ = tx.send(proxy);
+                                    },
+                                    Err(err) => {
+                                        error!("load cluster extension error: load extension failed, url: {}, err: {}", url, err);
+                                    },
+                                }
+                            },
+                            Some(cluster_extension) => {
+                                let _ = tx.send(cluster_extension.clone());
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
 }
@@ -212,96 +389,96 @@ impl ExtensionDirectoryCommander {
         }
     }
 
-    pub async fn load_protocol_extension(&self, name: &str, url: Url) -> Result<protocol_extension::proxy::ProtocolProxy, StdError> {
+    pub async fn load_protocol_extension(&self, url: Url) -> Result<protocol_extension::proxy::ProtocolProxy, StdError> {
         let (tx, rx) = oneshot::channel();
-        match self.sender.send(ExtensionOpt::LoadProtocolExtension(name.to_string(), url.clone(), tx)).await {
+        match self.sender.send(ExtensionOpt::LoadProtocolExtension(url.clone(), tx)).await {
             Ok(_) => {
                 match rx.await {
                     Ok(result) => Ok(result),
                     Err(_) => {
-                        error!("load protocol extension error: receive load extension response failed, name: {}, url: {}", name, url);
+                        error!("load protocol extension error: receive load extension response failed, url: {}", url);
                         return Err(LoadExtensionError::new("receive load extension response failed").into());
                     },
                 }
             },
             Err(_) => {
-                error!("load protocol extension error: send load extension request failed, name: {}, url: {}", name, url);
+                error!("load protocol extension error: send load extension request failed, url: {}", url);
                 return Err(LoadExtensionError::new("send load extension request failed").into());
             },
         }
     }
     
-    pub async fn load_registry_extension(&self, name: &str, url: Url) -> Result<registry_extension::proxy::RegistryProxy, StdError> {
+    pub async fn load_registry_extension(&self, url: Url) -> Result<registry_extension::proxy::RegistryProxy, StdError> {
         let (tx, rx) = oneshot::channel();
-        match self.sender.send(ExtensionOpt::LoadRegistryExtension(name.to_string(), url.clone(), tx)).await {
+        match self.sender.send(ExtensionOpt::LoadRegistryExtension(url.clone(), tx)).await {
             Ok(_) => {
                 match rx.await {
                     Ok(result) => Ok(result),
                     Err(_) => {
-                        error!("load registry extension error: receive load extension response failed, name: {}, url: {}", name, url);
+                        error!("load registry extension error: receive load extension response failed, url: {}", url);
                         return Err(LoadExtensionError::new("receive load extension response failed").into());
                     },
                 }
             },
             Err(_) => {
-                error!("load registry extension error: send load extension request failed, name: {}, url: {}", name, url);
+                error!("load registry extension error: send load extension request failed, url: {}", url);
                 return Err(LoadExtensionError::new("send load extension request failed").into());
             },
         }
     }
 
-    pub async fn load_cluster_extension(&self, name: &str, url: Url, invokers: Vec<Box<dyn Invoker + Send>>) -> Result<cluster_extension::proxy::ClusterProxy, StdError> {
+    pub async fn load_cluster_extension(&self, url: Url, invokers: Vec<Box<dyn Invoker + Send>>) -> Result<cluster_extension::proxy::ClusterProxy, StdError> {
         let (tx, rx) = oneshot::channel();
-        match self.sender.send(ExtensionOpt::LoadClusterExtension(name.to_string(), url.clone(), invokers, tx)).await {
+        match self.sender.send(ExtensionOpt::LoadClusterExtension(url.clone(), invokers, tx)).await {
             Ok(_) => {
                 match rx.await {
                     Ok(result) => Ok(result),
                     Err(_) => {
-                        error!("load cluster extension error: receive load extension response failed, name: {}, url: {}", name, url);
+                        error!("load cluster extension error: receive load extension response failed, url: {}", url);
                         return Err(LoadExtensionError::new("receive load extension response failed").into());
                     },
                 }
             },
             Err(_) => {
-                error!("load cluster extension error: send load extension request failed, name: {}, url: {}", name, url);
+                error!("load cluster extension error: send load extension request failed, url: {}", url);
                 return Err(LoadExtensionError::new("send load extension request failed").into());
             },
         }
     }
 
-    pub async fn load_load_balance_extension(&self, name: &str, url: Url, invokers: Vec<Box<dyn Invoker + Send>>) -> Result<load_balance_extension::proxy::LoadBalanceProxy, StdError> {
+    pub async fn load_load_balance_extension(&self, url: Url, invokers: Vec<Box<dyn Invoker + Send>>) -> Result<load_balance_extension::proxy::LoadBalanceProxy, StdError> {
         let (tx, rx) = oneshot::channel();
-        match self.sender.send(ExtensionOpt::LoadLoadBalanceExtension(name.to_string(), url.clone(), invokers, tx)).await {
+        match self.sender.send(ExtensionOpt::LoadLoadBalanceExtension(url.clone(), invokers, tx)).await {
             Ok(_) => {
                 match rx.await {
                     Ok(result) => Ok(result),
                     Err(_) => {
-                        error!("load load balance extension error: receive load extension response failed, name: {}, url: {}", name, url);
+                        error!("load load balance extension error: receive load extension response failed, url: {}", url);
                         return Err(LoadExtensionError::new("receive load extension response failed").into());
                     },
                 }
             },
             Err(_) => {
-                error!("load load balance extension error: send load extension request failed, name: {}, url: {}", name, url);
+                error!("load load balance extension error: send load extension request failed, url: {}", url);
                 return Err(LoadExtensionError::new("send load extension request failed").into());
             },
         }
     }
 
-    pub async fn load_router_extension(&self, name: &str, url: Url, invokers: Vec<Box<dyn Invoker + Send>>) -> Result<router_extension::proxy::RouterProxy, StdError> {
+    pub async fn load_router_extension(&self, url: Url, invokers: Vec<Box<dyn Invoker + Send>>) -> Result<router_extension::proxy::RouterProxy, StdError> {
         let (tx, rx) = oneshot::channel();
-        match self.sender.send(ExtensionOpt::LoadRouterExtension(name.to_string(), url.clone(), invokers, tx)).await {
+        match self.sender.send(ExtensionOpt::LoadRouterExtension(url.clone(), invokers, tx)).await {
             Ok(_) => {
                 match rx.await {
                     Ok(result) => Ok(result),
                     Err(_) => {
-                        error!("load router extension error: receive load extension response failed, name: {}, url: {}", name, url);
+                        error!("load router extension error: receive load extension response failed, url: {}", url);
                         return Err(LoadExtensionError::new("receive load extension response failed").into());
                     },
                 }
             },
             Err(_) => {
-                error!("load router extension error: send load extension request failed, name: {}, url: {}", name, url);
+                error!("load router extension error: send load extension request failed, url: {}", url);
                 return Err(LoadExtensionError::new("send load extension request failed").into());
             },
         }
@@ -357,11 +534,11 @@ pub enum ExtensionOpt {
     RemoveLoadBalanceExtensionLoader(String),
     RemoveRouterExtensionLoader(String),
 
-    LoadProtocolExtension(String, Url, oneshot::Sender<protocol_extension::proxy::ProtocolProxy>),
-    LoadRegistryExtension(String, Url, oneshot::Sender<registry_extension::proxy::RegistryProxy>),
-    LoadClusterExtension(String, Url, Vec<Box<dyn Invoker + Send>>, oneshot::Sender<cluster_extension::proxy::ClusterProxy>),
-    LoadLoadBalanceExtension(String, Url, Vec<Box<dyn Invoker + Send>>, oneshot::Sender<load_balance_extension::proxy::LoadBalanceProxy>),
-    LoadRouterExtension(String, Url, Vec<Box<dyn Invoker + Send>>, oneshot::Sender<router_extension::proxy::RouterProxy>),
+    LoadProtocolExtension(Url, oneshot::Sender<protocol_extension::proxy::ProtocolProxy>),
+    LoadRegistryExtension(Url, oneshot::Sender<registry_extension::proxy::RegistryProxy>),
+    LoadClusterExtension(Url, Vec<Box<dyn Invoker + Send>>, oneshot::Sender<cluster_extension::proxy::ClusterProxy>),
+    LoadLoadBalanceExtension(Url, Vec<Box<dyn Invoker + Send>>, oneshot::Sender<load_balance_extension::proxy::LoadBalanceProxy>),
+    LoadRouterExtension(Url, Vec<Box<dyn Invoker + Send>>, oneshot::Sender<router_extension::proxy::RouterProxy>),
 }
 
 
@@ -373,7 +550,7 @@ macro_rules! extension_loader {
         pub trait $name {
             fn name(&self) -> String;
 
-            async fn load(&mut self, url: &Url) -> Result<Box<dyn $extension_type>, StdError>;
+            async fn load(&mut self, url: &Url) -> Result<Box<dyn $extension_type + Send>, StdError>;
         }
     };
 }
