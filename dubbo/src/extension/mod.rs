@@ -1,14 +1,10 @@
 use std::collections::HashMap;
-use std::sync::Arc;
 
-use async_trait::async_trait;
-use futures::Stream;
 use thiserror::Error;
-use tokio::sync::{mpsc::Receiver, watch, oneshot, Notify};
-use tower::discover::Change;
-use tracing::{error, warn, debug};
+use tokio::sync::oneshot;
+use tracing::{error, debug};
 
-use crate::{url::Url, StdError, inv::Invoker, param::{Extension, Param}, extension::{protocol_extension::proxy::ProtocolOpt, registry_extension::proxy::RegistryOpt}};
+use crate::{url::Url, StdError, param::{Extension, Param}, extension::{protocol_extension::proxy::ProtocolOpt, registry_extension::proxy::RegistryOpt}};
 
 use self::{registry_extension::Registry, protocol_extension::Protocol, cluster_extension::Cluster, load_balance_extension::LoadBalance, router_extension::Router};
 
@@ -18,26 +14,90 @@ mod cluster_extension;
 mod load_balance_extension;
 mod router_extension;
 
-#[derive(Default)]
-pub struct ExtensionDirectory {
+static INSTANCE: once_cell::sync::Lazy<ExtensionDirectoryCommander> = once_cell::sync::Lazy::new(|| ExtensionDirectory::init());
 
-    protocol_extension_loaders: HashMap<String, Box<dyn ProtocolExtensionLoader>>,
+pub async fn add_protocol_extension_loader(loader: Box<dyn ProtocolExtensionLoader + Send>) -> Result<(), StdError> {
+    INSTANCE.add_protocol_extension_loader(loader).await
+}
+
+
+pub async fn add_registry_extension_loader(loader: Box<dyn RegistryExtensionLoader + Send>) -> Result<(), StdError> {
+    INSTANCE.add_registry_extension_loader(loader).await
+}
+
+pub async fn add_cluster_extension_loader(loader: Box<dyn ClusterExtensionLoader + Send>) -> Result<(), StdError> {
+    INSTANCE.add_cluster_extension_loader(loader).await
+}
+
+pub async fn add_load_balance_extension_loader(loader: Box<dyn LoadBalanceExtensionLoader + Send>) -> Result<(), StdError> {
+    INSTANCE.add_load_balance_extension_loader(loader).await
+}
+
+pub async fn add_router_extension_loader(loader: Box<dyn RouterExtensionLoader + Send>) -> Result<(), StdError> {
+    INSTANCE.add_router_extension_loader(loader).await
+}
+
+pub async fn remove_protocol_extension_loader(name: &str) -> Result<(), StdError> {
+    INSTANCE.remove_protocol_extension_loader(name).await
+}
+
+pub async fn remove_registry_extension_loader(name: &str) -> Result<(), StdError> {
+    INSTANCE.remove_registry_extension_loader(name).await
+}
+
+pub async fn remove_cluster_extension_loader(name: &str) -> Result<(), StdError> {
+    INSTANCE.remove_cluster_extension_loader(name).await
+}
+
+pub async fn remove_load_balance_extension_loader(name: &str) -> Result<(), StdError> {
+    INSTANCE.remove_load_balance_extension_loader(name).await
+}
+
+pub async fn remove_router_extension_loader(name: &str) -> Result<(), StdError> {
+    INSTANCE.remove_router_extension_loader(name).await
+}
+
+pub async fn load_protocol_extension(url: Url) -> Result<protocol_extension::proxy::ProtocolProxy, StdError> {
+    INSTANCE.load_protocol_extension(url).await
+}
+
+pub async fn load_registry_extension(url: Url) -> Result<registry_extension::proxy::RegistryProxy, StdError> {
+    INSTANCE.load_registry_extension(url).await
+}
+
+pub async fn load_cluster_extension(url: Url) -> Result<cluster_extension::proxy::ClusterProxy, StdError> {
+    INSTANCE.load_cluster_extension(url).await
+}
+
+pub async fn load_load_balance_extension(url: Url) -> Result<load_balance_extension::proxy::LoadBalanceProxy, StdError> {
+    INSTANCE.load_load_balance_extension(url).await
+}
+
+pub async fn load_router_extension(url: Url) -> Result<router_extension::proxy::RouterProxy, StdError> {
+    INSTANCE.load_router_extension(url).await
+}
+
+
+#[derive(Default)]
+struct ExtensionDirectory {
+
+    protocol_extension_loaders: HashMap<String, Box<dyn ProtocolExtensionLoader + Send>>,
 
     protocol_extensions: HashMap<String, protocol_extension::proxy::ProtocolProxy>,
 
-    registry_extension_loaders: HashMap<String, Box<dyn RegistryExtensionLoader>>,
+    registry_extension_loaders: HashMap<String, Box<dyn RegistryExtensionLoader + Send>>,
 
     registry_extensions: HashMap<String, registry_extension::proxy::RegistryProxy>,
 
-    cluster_extension_loaders: HashMap<String, Box<dyn ClusterExtensionLoader>>,
+    cluster_extension_loaders: HashMap<String, Box<dyn ClusterExtensionLoader + Send>>,
 
     cluster_extensions: HashMap<String, cluster_extension::proxy::ClusterProxy>,
 
-    load_balance_extension_loaders: HashMap<String, Box<dyn LoadBalanceExtensionLoader>>,
+    load_balance_extension_loaders: HashMap<String, Box<dyn LoadBalanceExtensionLoader + Send>>,
 
     load_balance_extensions: HashMap<String, load_balance_extension::proxy::LoadBalanceProxy>,
 
-    router_extension_loaders: HashMap<String, Box<dyn RouterExtensionLoader>>,
+    router_extension_loaders: HashMap<String, Box<dyn RouterExtensionLoader + Send>>,
 
     router_extensions: HashMap<String, router_extension::proxy::RouterProxy>,
 }
@@ -45,14 +105,17 @@ pub struct ExtensionDirectory {
 
 impl ExtensionDirectory {
 
-    pub fn init() -> ExtensionDirectoryCommander {
+    fn init() -> ExtensionDirectoryCommander {
 
         let (tx, rx) = tokio::sync::mpsc::channel::<ExtensionOpt>(64);
 
-        let mut directory = ExtensionDirectory::default();
+        let directory = ExtensionDirectory::default();
 
+        tokio::spawn(async move {
+            directory.run(rx).await;
+        });
         
-        todo!()
+        ExtensionDirectoryCommander::new(tx)
 
     }
 
@@ -71,7 +134,12 @@ impl ExtensionDirectory {
             ExtensionOpt::RemoveRegistryExtensionLoader(name) => self.remove_registry_extension_loader(&name),
             ExtensionOpt::RemoveRouterExtensionLoader(name) => self.remove_router_extension_loader(&name),
 
-            _ => {}
+
+            ExtensionOpt::LoadProtocolExtension(url, tx) => self.load_protocol_extension(url, tx).await,
+            ExtensionOpt::LoadRegistryExtension(url, tx) => self.load_registry_extension(url, tx).await,
+            ExtensionOpt::LoadClusterExtension(url, tx) => self.load_cluster_extension(url, tx).await,
+            ExtensionOpt::LoadLoadBalanceExtension(url, tx) => self.load_load_balance_extension(url, tx).await,
+            ExtensionOpt::LoadRouterExtension(url, tx) => self.load_router_extension(url, tx).await,
            }
        }
     }
@@ -253,7 +321,7 @@ impl ExtensionDirectory {
     }
 
 
-    async fn load_cluster_extension(&mut self, url: Url, invokers: Vec<Box<dyn Invoker + Send>>, tx: oneshot::Sender<cluster_extension::proxy::ClusterProxy>) {
+    async fn load_cluster_extension(&mut self, url: Url, tx: oneshot::Sender<cluster_extension::proxy::ClusterProxy>) {
         debug!("load cluster extension, url: {}", url);
         let extension = url.query::<Extension>();
         match extension {
@@ -409,89 +477,89 @@ impl ExtensionDirectory {
 }
 
 
-pub struct ExtensionDirectoryCommander {
+struct ExtensionDirectoryCommander {
     sender: tokio::sync::mpsc::Sender<ExtensionOpt>,
 }
 
 impl ExtensionDirectoryCommander {
 
-    pub fn new(sender: tokio::sync::mpsc::Sender<ExtensionOpt>) -> Self {
+    fn new(sender: tokio::sync::mpsc::Sender<ExtensionOpt>) -> Self {
         ExtensionDirectoryCommander {
             sender,
         }
     }
 
-    pub async fn add_protocol_extension_loader(&self, loader: Box<dyn ProtocolExtensionLoader + Send>) -> Result<(), StdError> {
+    async fn add_protocol_extension_loader(&self, loader: Box<dyn ProtocolExtensionLoader + Send>) -> Result<(), StdError> {
         match self.sender.send(ExtensionOpt::AddProtocolExtensionLoader(loader)).await {
             Ok(_) => Ok(()),
             Err(_) => Err(AddExtensionLoaderError::new("add protocol extension loader failed").into()),
         }
     }
 
-    pub async fn add_registry_extension_loader(&self, loader: Box<dyn RegistryExtensionLoader + Send>) -> Result<(), StdError> {
+    async fn add_registry_extension_loader(&self, loader: Box<dyn RegistryExtensionLoader + Send>) -> Result<(), StdError> {
         match self.sender.send(ExtensionOpt::AddRegistryExtensionLoader(loader)).await {
             Ok(_) => Ok(()),
             Err(_) => Err(AddExtensionLoaderError::new("add registry extension loader failed").into()),
         }
     }
 
-    pub async fn add_cluster_extension_loader(&self, loader: Box<dyn ClusterExtensionLoader + Send>) -> Result<(), StdError> {
+    async fn add_cluster_extension_loader(&self, loader: Box<dyn ClusterExtensionLoader + Send>) -> Result<(), StdError> {
         match self.sender.send(ExtensionOpt::AddClusterExtensionLoader(loader)).await {
             Ok(_) => Ok(()),
             Err(_) => Err(AddExtensionLoaderError::new("add cluster extension loader failed").into()),
         }
     }
 
-    pub async fn add_load_balance_extension_loader(&self, loader: Box<dyn LoadBalanceExtensionLoader + Send>) -> Result<(), StdError> {
+    async fn add_load_balance_extension_loader(&self, loader: Box<dyn LoadBalanceExtensionLoader + Send>) -> Result<(), StdError> {
         match self.sender.send(ExtensionOpt::AddLoadBalanceExtensionLoader(loader)).await {
             Ok(_) => Ok(()),
             Err(_) => Err(AddExtensionLoaderError::new("add load balance extension loader failed").into()),
         }
     }
 
-    pub async fn add_router_extension_loader(&self, loader: Box<dyn RouterExtensionLoader + Send>) -> Result<(), StdError> {
+    async fn add_router_extension_loader(&self, loader: Box<dyn RouterExtensionLoader + Send>) -> Result<(), StdError> {
         match self.sender.send(ExtensionOpt::AddRouterExtensionLoader(loader)).await {
             Ok(_) => Ok(()),
             Err(_) => Err(AddExtensionLoaderError::new("add router extension loader failed").into()),
         }
     }
 
-    pub async fn remove_protocol_extension_loader(&self, name: &str) -> Result<(), StdError> {
+    async fn remove_protocol_extension_loader(&self, name: &str) -> Result<(), StdError> {
         match self.sender.send(ExtensionOpt::RemoveProtocolExtensionLoader(name.to_string())).await {
             Ok(_) => Ok(()),
             Err(_) => Err(RemoveExtensionLoaderError::new("remove protocol extension loader failed").into()),
         }
     }
 
-    pub async fn remove_registry_extension_loader(&self, name: &str) -> Result<(), StdError> {
+    async fn remove_registry_extension_loader(&self, name: &str) -> Result<(), StdError> {
         match self.sender.send(ExtensionOpt::RemoveRegistryExtensionLoader(name.to_string())).await {
             Ok(_) => Ok(()),
             Err(_) => Err(RemoveExtensionLoaderError::new("remove registry extension loader failed").into()),
         }
     }
 
-    pub async fn remove_cluster_extension_loader(&self, name: &str) -> Result<(), StdError> {
+    async fn remove_cluster_extension_loader(&self, name: &str) -> Result<(), StdError> {
         match self.sender.send(ExtensionOpt::RemoveClusterExtensionLoader(name.to_string())).await {
             Ok(_) => Ok(()),
             Err(_) => Err(RemoveExtensionLoaderError::new("remove cluster extension loader failed").into()),
         }
     }
 
-    pub async fn remove_load_balance_extension_loader(&self, name: &str) -> Result<(), StdError> {
+    async fn remove_load_balance_extension_loader(&self, name: &str) -> Result<(), StdError> {
         match self.sender.send(ExtensionOpt::RemoveLoadBalanceExtensionLoader(name.to_string())).await {
             Ok(_) => Ok(()),
             Err(_) => Err(RemoveExtensionLoaderError::new("remove load balance extension loader failed").into()),
         }
     }
 
-    pub async fn remove_router_extension_loader(&self, name: &str) -> Result<(), StdError> {
+    async fn remove_router_extension_loader(&self, name: &str) -> Result<(), StdError> {
         match self.sender.send(ExtensionOpt::RemoveRouterExtensionLoader(name.to_string())).await {
             Ok(_) => Ok(()),
             Err(_) => Err(RemoveExtensionLoaderError::new("remove router extension loader failed").into()),
         }
     }
 
-    pub async fn load_protocol_extension(&self, url: Url) -> Result<protocol_extension::proxy::ProtocolProxy, StdError> {
+    async fn load_protocol_extension(&self, url: Url) -> Result<protocol_extension::proxy::ProtocolProxy, StdError> {
         let (tx, rx) = oneshot::channel();
         match self.sender.send(ExtensionOpt::LoadProtocolExtension(url.clone(), tx)).await {
             Ok(_) => {
@@ -510,7 +578,7 @@ impl ExtensionDirectoryCommander {
         }
     }
     
-    pub async fn load_registry_extension(&self, url: Url) -> Result<registry_extension::proxy::RegistryProxy, StdError> {
+    async fn load_registry_extension(&self, url: Url) -> Result<registry_extension::proxy::RegistryProxy, StdError> {
         let (tx, rx) = oneshot::channel();
         match self.sender.send(ExtensionOpt::LoadRegistryExtension(url.clone(), tx)).await {
             Ok(_) => {
@@ -529,9 +597,9 @@ impl ExtensionDirectoryCommander {
         }
     }
 
-    pub async fn load_cluster_extension(&self, url: Url, invokers: Vec<Box<dyn Invoker + Send>>) -> Result<cluster_extension::proxy::ClusterProxy, StdError> {
+    async fn load_cluster_extension(&self, url: Url) -> Result<cluster_extension::proxy::ClusterProxy, StdError> {
         let (tx, rx) = oneshot::channel();
-        match self.sender.send(ExtensionOpt::LoadClusterExtension(url.clone(), invokers, tx)).await {
+        match self.sender.send(ExtensionOpt::LoadClusterExtension(url.clone(), tx)).await {
             Ok(_) => {
                 match rx.await {
                     Ok(result) => Ok(result),
@@ -548,9 +616,9 @@ impl ExtensionDirectoryCommander {
         }
     }
 
-    pub async fn load_load_balance_extension(&self, url: Url, invokers: Vec<Box<dyn Invoker + Send>>) -> Result<load_balance_extension::proxy::LoadBalanceProxy, StdError> {
+    async fn load_load_balance_extension(&self, url: Url) -> Result<load_balance_extension::proxy::LoadBalanceProxy, StdError> {
         let (tx, rx) = oneshot::channel();
-        match self.sender.send(ExtensionOpt::LoadLoadBalanceExtension(url.clone(), invokers, tx)).await {
+        match self.sender.send(ExtensionOpt::LoadLoadBalanceExtension(url.clone(), tx)).await {
             Ok(_) => {
                 match rx.await {
                     Ok(result) => Ok(result),
@@ -567,9 +635,9 @@ impl ExtensionDirectoryCommander {
         }
     }
 
-    pub async fn load_router_extension(&self, url: Url, invokers: Vec<Box<dyn Invoker + Send>>) -> Result<router_extension::proxy::RouterProxy, StdError> {
+    async fn load_router_extension(&self, url: Url) -> Result<router_extension::proxy::RouterProxy, StdError> {
         let (tx, rx) = oneshot::channel();
-        match self.sender.send(ExtensionOpt::LoadRouterExtension(url.clone(), invokers, tx)).await {
+        match self.sender.send(ExtensionOpt::LoadRouterExtension(url.clone(), tx)).await {
             Ok(_) => {
                 match rx.await {
                     Ok(result) => Ok(result),
@@ -623,7 +691,7 @@ impl LoadExtensionError {
 
 
 
-pub enum ExtensionOpt {
+enum ExtensionOpt {
     AddProtocolExtensionLoader(Box<dyn ProtocolExtensionLoader + Send>),
     AddRegistryExtensionLoader(Box<dyn RegistryExtensionLoader + Send>),
     AddClusterExtensionLoader(Box<dyn ClusterExtensionLoader + Send>),
@@ -638,9 +706,9 @@ pub enum ExtensionOpt {
 
     LoadProtocolExtension(Url, oneshot::Sender<protocol_extension::proxy::ProtocolProxy>),
     LoadRegistryExtension(Url, oneshot::Sender<registry_extension::proxy::RegistryProxy>),
-    LoadClusterExtension(Url, Vec<Box<dyn Invoker + Send>>, oneshot::Sender<cluster_extension::proxy::ClusterProxy>),
-    LoadLoadBalanceExtension(Url, Vec<Box<dyn Invoker + Send>>, oneshot::Sender<load_balance_extension::proxy::LoadBalanceProxy>),
-    LoadRouterExtension(Url, Vec<Box<dyn Invoker + Send>>, oneshot::Sender<router_extension::proxy::RouterProxy>),
+    LoadClusterExtension(Url,  oneshot::Sender<cluster_extension::proxy::ClusterProxy>),
+    LoadLoadBalanceExtension(Url, oneshot::Sender<load_balance_extension::proxy::LoadBalanceProxy>),
+    LoadRouterExtension(Url,  oneshot::Sender<router_extension::proxy::RouterProxy>),
 }
 
 

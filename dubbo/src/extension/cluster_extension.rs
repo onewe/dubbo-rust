@@ -23,7 +23,7 @@ pub mod proxy {
 
     use super::Cluster;
 
-    pub enum ClusterOpt {
+    pub(crate) enum ClusterOpt {
         Join(Url, Vec<Box<dyn Invoker + Send>>, oneshot::Sender<Result<Box<dyn Invoker + Send>, StdError>>),
     }
 
@@ -34,7 +34,7 @@ pub mod proxy {
 
     impl ClusterProxy {
 
-        pub fn new(sender: tokio::sync::mpsc::Sender<ClusterOpt>) -> Self {
+        pub(crate) fn new(sender: tokio::sync::mpsc::Sender<ClusterOpt>) -> Self {
             ClusterProxy {
                 sender,
             }

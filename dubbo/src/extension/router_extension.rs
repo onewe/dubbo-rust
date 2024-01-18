@@ -20,7 +20,7 @@ pub mod proxy {
 
     use super::Router;
 
-    pub enum RouterOpt {
+    pub(crate) enum RouterOpt {
         Route(Vec<Box<dyn Invoker + Send>>, oneshot::Sender<Result<Vec<Box<dyn Invoker + Send>>, StdError>>),
     }
 
@@ -31,7 +31,7 @@ pub mod proxy {
 
     impl RouterProxy {
 
-        pub fn new(sender: tokio::sync::mpsc::Sender<RouterOpt>) -> Self {
+        pub(crate) fn new(sender: tokio::sync::mpsc::Sender<RouterOpt>) -> Self {
             RouterProxy {
                 sender,
             }

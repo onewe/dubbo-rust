@@ -21,7 +21,7 @@ pub mod proxy {
 
     use super::LoadBalance;
 
-    pub enum LoadBalanceOpt {
+    pub(crate) enum LoadBalanceOpt {
         Select(Vec<Box<dyn Invoker + Send>>, oneshot::Sender<Result<Box<dyn Invoker + Send>, StdError>>),
     }
 
@@ -32,11 +32,11 @@ pub mod proxy {
 
     impl LoadBalanceProxy {
             
-            pub fn new(sender: tokio::sync::mpsc::Sender<LoadBalanceOpt>) -> Self {
-                LoadBalanceProxy {
-                    sender,
-                }
+        pub(crate) fn new(sender: tokio::sync::mpsc::Sender<LoadBalanceOpt>) -> Self {
+            LoadBalanceProxy {
+                sender,
             }
+        }
     }
 
     #[async_trait]

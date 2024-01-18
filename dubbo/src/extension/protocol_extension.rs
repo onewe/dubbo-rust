@@ -24,7 +24,7 @@ pub mod proxy {
     use super::Protocol;
 
 
-    pub enum ProtocolOpt {
+    pub(crate) enum ProtocolOpt {
         Export(Url, oneshot::Sender<Result<(), StdError>>),
         Refer(Url, oneshot::Sender<Result<Box<dyn Invoker + Send>, StdError>>),
     }
@@ -36,7 +36,7 @@ pub mod proxy {
 
     impl ProtocolProxy {
 
-        pub fn new(sender: tokio::sync::mpsc::Sender<ProtocolOpt>) -> Self {
+        pub(crate) fn new(sender: tokio::sync::mpsc::Sender<ProtocolOpt>) -> Self {
             ProtocolProxy {
                 sender,
             }

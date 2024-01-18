@@ -3,9 +3,6 @@ use futures::Stream;
 
 use crate::{url::Url, StdError};
 
-
-
-
 #[async_trait]
 pub trait Registry {
 
@@ -31,7 +28,7 @@ pub mod proxy {
     use super::Registry;
 
 
-    pub enum RegistryOpt {
+    pub(crate) enum RegistryOpt {
         Register(Url, oneshot::Sender<Result<(), StdError>>),
         Unregister(Url, oneshot::Sender<Result<(), StdError>>),
         Subscribe(Url, oneshot::Sender<Result<Box<dyn Stream<Item = Vec<String>> + Send>, StdError>>),
@@ -44,7 +41,7 @@ pub mod proxy {
     }
 
     impl RegistryProxy {
-        pub fn new(sender: tokio::sync::mpsc::Sender<RegistryOpt>) -> Self {
+        pub(crate) fn new(sender: tokio::sync::mpsc::Sender<RegistryOpt>) -> Self {
             RegistryProxy {
                 sender,
             }
