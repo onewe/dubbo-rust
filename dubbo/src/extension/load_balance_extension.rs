@@ -25,8 +25,18 @@ pub mod proxy {
         Select(Vec<Box<dyn Invoker + Send>>, oneshot::Sender<Result<Box<dyn Invoker + Send>, StdError>>),
     }
 
+    #[derive(Clone)]
     pub struct LoadBalanceProxy {
         sender: tokio::sync::mpsc::Sender<LoadBalanceOpt>,
+    }
+
+    impl LoadBalanceProxy {
+            
+            pub fn new(sender: tokio::sync::mpsc::Sender<LoadBalanceOpt>) -> Self {
+                LoadBalanceProxy {
+                    sender,
+                }
+            }
     }
 
     #[async_trait]

@@ -24,8 +24,18 @@ pub mod proxy {
         Route(Vec<Box<dyn Invoker + Send>>, oneshot::Sender<Result<Vec<Box<dyn Invoker + Send>>, StdError>>),
     }
 
+    #[derive(Clone)]
     pub struct RouterProxy {
         sender: tokio::sync::mpsc::Sender<RouterOpt>,
+    }
+
+    impl RouterProxy {
+
+        pub fn new(sender: tokio::sync::mpsc::Sender<RouterOpt>) -> Self {
+            RouterProxy {
+                sender,
+            }
+        }
     }
 
     #[async_trait]

@@ -304,6 +304,108 @@ impl ExtensionDirectory {
         }
     }
 
+    async fn load_load_balance_extension(&mut self, url: Url, tx: oneshot::Sender<load_balance_extension::proxy::LoadBalanceProxy>) {
+        debug!("load load balance extension, url: {}", url);
+        let extension = url.query::<Extension>();
+        match extension {
+            None => {
+                error!("load load balance extension error: extension not found, url: {}", url);
+            },
+            Some(extension) => {
+                let name = extension.value();
+                match self.load_balance_extension_loaders.get_mut(&name) {
+                    None => {
+                        error!("load load balance extension error: extension loader not found, url: {}", url);
+                    },
+                    Some(extension_loader) => {
+                        let extension_cache_key = url.to_string();
+                        match self.load_balance_extensions.get(&extension_cache_key) {
+                            None => {
+                                match extension_loader.load(&url).await {
+                                    Ok(load_balance_extension) => {
+                                        let (extension_opt_tx, mut extension_opt_rx) = tokio::sync::mpsc::channel(64);
+                                        tokio::spawn(async move {
+                                            while let Some(opt) = extension_opt_rx.recv().await {
+                                                match opt {
+                                                    load_balance_extension::proxy::LoadBalanceOpt::Select(invokers, callback) => {
+                                                        let select = load_balance_extension.select(invokers);
+                                                        let _ = callback.send(select.await);
+                                                    },
+                                                }
+                                            }
+                                            debug!("load balance extension destroy, url: {}", url);
+                                        });
+
+                                        let proxy = load_balance_extension::proxy::LoadBalanceProxy::new(extension_opt_tx);
+                                        self.load_balance_extensions.insert(extension_cache_key, proxy.clone());
+                                        let _ = tx.send(proxy);
+                                    },
+                                    Err(err) => {
+                                        error!("load load balance extension error: load extension failed, url: {}, err: {}", url, err);
+                                    },
+                                }
+                            },
+                            Some(load_balance_extension) => {
+                                let _ = tx.send(load_balance_extension.clone());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    async fn load_router_extension(&mut self, url: Url, tx: oneshot::Sender<router_extension::proxy::RouterProxy>) {
+        debug!("load router extension, url: {}", url);
+        let extension = url.query::<Extension>();
+        match extension {
+            None => {
+                error!("load router extension error: extension not found, url: {}", url);
+            },
+            Some(extension) => {
+                let name = extension.value();
+                match self.router_extension_loaders.get_mut(&name) {
+                    None => {
+                        error!("load router extension error: extension loader not found, url: {}", url);
+                    },
+                    Some(extension_loader) => {
+                        let extension_cache_key = url.to_string();
+                        match self.router_extensions.get(&extension_cache_key) {
+                            None => {
+                                match extension_loader.load(&url).await {
+                                    Ok(router_extension) => {
+                                        let (extension_opt_tx, mut extension_opt_rx) = tokio::sync::mpsc::channel(64);
+                                        tokio::spawn(async move {
+                                            while let Some(opt) = extension_opt_rx.recv().await {
+                                                match opt {
+                                                    router_extension::proxy::RouterOpt::Route(invokers, callback) => {
+                                                        let route = router_extension.route(invokers);
+                                                        let _ = callback.send(route.await);
+                                                    },
+                                                }
+                                            }
+                                            debug!("router extension destroy, url: {}", url);
+                                        });
+
+                                        let proxy = router_extension::proxy::RouterProxy::new(extension_opt_tx);
+                                        self.router_extensions.insert(extension_cache_key, proxy.clone());
+                                        let _ = tx.send(proxy);
+                                    },
+                                    Err(err) => {
+                                        error!("load router extension error: load extension failed, url: {}, err: {}", url, err);
+                                    },
+                                }
+                            },
+                            Some(router_extension) => {
+                                let _ = tx.send(router_extension.clone());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
 }
 
 
