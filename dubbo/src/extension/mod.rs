@@ -390,7 +390,7 @@ impl ExtensionDirectory {
                         match self.load_balance_extensions.get(&extension_cache_key) {
                             None => {
                                 match extension_loader.load(&url).await {
-                                    Ok(load_balance_extension) => {
+                                    Ok(mut load_balance_extension) => {
                                         let (extension_opt_tx, mut extension_opt_rx) = tokio::sync::mpsc::channel(64);
                                         tokio::spawn(async move {
                                             while let Some(opt) = extension_opt_rx.recv().await {
@@ -441,7 +441,7 @@ impl ExtensionDirectory {
                         match self.router_extensions.get(&extension_cache_key) {
                             None => {
                                 match extension_loader.load(&url).await {
-                                    Ok(router_extension) => {
+                                    Ok(mut router_extension) => {
                                         let (extension_opt_tx, mut extension_opt_rx) = tokio::sync::mpsc::channel(64);
                                         tokio::spawn(async move {
                                             while let Some(opt) = extension_opt_rx.recv().await {

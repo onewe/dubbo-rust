@@ -5,7 +5,7 @@ use crate::{inv::Invoker, StdError};
 #[async_trait]
 pub trait Router {
     
-    async fn route(&self, invokes: Vec<Box<dyn Invoker + Send>>) -> Result<Vec<Box<dyn Invoker + Send>>, StdError>;
+    async fn route(&mut self, invokes: Vec<Box<dyn Invoker + Send>>) -> Result<Vec<Box<dyn Invoker + Send>>, StdError>;
 }
 
 
@@ -41,7 +41,7 @@ pub mod proxy {
     #[async_trait]
     impl Router for RouterProxy {
 
-        async fn route(&self, invokes: Vec<Box<dyn Invoker + Send>>) -> Result<Vec<Box<dyn Invoker + Send>>, StdError> {
+        async fn route(&mut self, invokes: Vec<Box<dyn Invoker + Send>>) -> Result<Vec<Box<dyn Invoker + Send>>, StdError> {
             let (tx, rx) = oneshot::channel();
 
             match self.sender.send(RouterOpt::Route(invokes, tx)).await {

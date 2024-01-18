@@ -6,7 +6,7 @@ use crate::{inv::Invoker, StdError};
 #[async_trait]
 pub trait LoadBalance {
 
-    async fn select(&self, invokes: Vec<Box<dyn Invoker + Send>>) -> Result<Box<dyn Invoker + Send>, StdError>;
+    async fn select(&mut self, invokes: Vec<Box<dyn Invoker + Send>>) -> Result<Box<dyn Invoker + Send>, StdError>;
     
 }
 
@@ -42,7 +42,7 @@ pub mod proxy {
     #[async_trait]
     impl LoadBalance for LoadBalanceProxy {
 
-        async fn select(&self, invokes: Vec<Box<dyn Invoker + Send>>) -> Result<Box<dyn Invoker + Send>, StdError> {
+        async fn select(&mut self, invokes: Vec<Box<dyn Invoker + Send>>) -> Result<Box<dyn Invoker + Send>, StdError> {
             let (tx, rx) = oneshot::channel();
 
             match self.sender.send(LoadBalanceOpt::Select(invokes, tx)).await {
