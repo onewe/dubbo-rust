@@ -81,6 +81,12 @@ impl Url {
         self.inner.as_str()
     }
 
+    pub fn short_url_without_query(&self) -> String {
+       let mut url = self.inner.clone();
+       url.set_query(Some(""));
+       url.into()
+    }
+
 }
 
 

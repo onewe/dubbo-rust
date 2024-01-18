@@ -1,5 +1,7 @@
+use std::collections::HashSet;
+
 use async_trait::async_trait;
-use futures::Stream;
+use tokio::sync::watch;
 
 use crate::{url::Url, StdError};
 
@@ -10,17 +12,18 @@ pub trait Registry {
 
     async fn unregister(&mut self, url: Url) -> Result<(), StdError>;
 
-    async fn subscribe(&mut self, url: Url) -> Result<Box<dyn Stream<Item = Vec<String>> + Send>, StdError>;
+    async fn subscribe(&mut self, url: Url) -> Result<watch::Receiver<HashSet<String>>, StdError>;
 
 }
 
 
 pub mod proxy {
 
+    use std::collections::HashSet;
+
     use async_trait::async_trait;
-    use futures::Stream;
     use thiserror::Error;
-    use tokio::sync::oneshot;
+    use tokio::sync::{oneshot, watch};
     use tracing::error;
     use crate::url::Url;
     use crate::StdError;
@@ -31,7 +34,7 @@ pub mod proxy {
     pub(crate) enum RegistryOpt {
         Register(Url, oneshot::Sender<Result<(), StdError>>),
         Unregister(Url, oneshot::Sender<Result<(), StdError>>),
-        Subscribe(Url, oneshot::Sender<Result<Box<dyn Stream<Item = Vec<String>> + Send>, StdError>>),
+        Subscribe(Url, oneshot::Sender<Result<watch::Receiver<HashSet<String>>, StdError>>),
         
     }
 
@@ -90,7 +93,7 @@ pub mod proxy {
             }
         }
 
-        async fn subscribe(&mut self, url: Url) -> Result<Box<dyn Stream<Item = Vec<String>> + Send>, StdError> {
+        async fn subscribe(&mut self, url: Url) -> Result<watch::Receiver<HashSet<String>>, StdError> {
             let (tx, rx) = oneshot::channel();
 
             match self.sender.send(RegistryOpt::Subscribe(url.clone(), tx)).await {

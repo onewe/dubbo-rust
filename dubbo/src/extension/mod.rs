@@ -8,11 +8,11 @@ use crate::{url::Url, StdError, param::{Extension, Param}, extension::{protocol_
 
 use self::{registry_extension::Registry, protocol_extension::Protocol, cluster_extension::Cluster, load_balance_extension::LoadBalance, router_extension::Router};
 
-mod registry_extension;
-mod protocol_extension;
-mod cluster_extension;
-mod load_balance_extension;
-mod router_extension;
+pub mod registry_extension;
+pub mod protocol_extension;
+pub mod cluster_extension;
+pub mod load_balance_extension;
+pub mod router_extension;
 
 static INSTANCE: once_cell::sync::Lazy<ExtensionDirectoryCommander> = once_cell::sync::Lazy::new(|| ExtensionDirectory::init());
 

@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::{inv::{Invoker, cloneable_invoker::CloneableInvoker}, StdError};
+use crate::{inv::{cloneable_invoker::CloneableInvoker}, StdError};
 
 mod static_directory;
 mod dynamic_directory;

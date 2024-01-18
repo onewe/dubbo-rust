@@ -1,7 +1,3 @@
-use url::Url;
-
-use crate::param::ReferenceUrl;
-
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -18,6 +14,10 @@ use crate::param::ReferenceUrl;
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+use url::Url;
+
+use crate::param::ReferenceUrl;
+ 
 mod extension;
 mod url;
 mod config;
@@ -42,26 +42,6 @@ impl DubboBootstrap {
             reference_configs: Vec::new(),
         }
     }
-
-    // pub fn add_protocol_extension_loader(&mut self, loader: Box<dyn extension::ProtocolExtensionLoader>) {
-    //     self.extension_directory.add_protocol_extension_loader(loader);
-    // }
-
-    // pub fn add_registry_extension_loader(&mut self, loader: Box<dyn extension::RegistryExtensionLoader>) {
-    //     self.extension_directory.add_registry_extension_loader(loader);
-    // }
-
-    // pub fn add_cluster_extension_loader(&mut self, loader: Box<dyn extension::ClusterExtensionLoader>) {
-    //     self.extension_directory.add_cluster_extension_loader(loader);
-    // }
-
-    // pub fn add_load_balance_extension_loader(&mut self, loader: Box<dyn extension::LoadBalanceExtensionLoader>) {
-    //     self.extension_directory.add_load_balance_extension_loader(loader);
-    // }
-
-    // pub fn add_router_extension_loader(&mut self, loader: Box<dyn extension::RouterExtensionLoader>) {
-    //     self.extension_directory.add_router_extension_loader(loader);
-    // }
 
     pub fn add_application_config(&mut self, config: config::ApplicationConfig) {
         self.application_configs.push(config);
