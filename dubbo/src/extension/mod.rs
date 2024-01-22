@@ -4,7 +4,7 @@ use thiserror::Error;
 use tokio::sync::oneshot;
 use tracing::{error, debug};
 
-use crate::{url::Url, StdError, param::{Extension, Param}, extension::{protocol_extension::proxy::ProtocolOpt, registry_extension::proxy::RegistryOpt}};
+use crate::{url::Url, StdError, param::{Param, ExtensionName}, extension::{protocol_extension::proxy::ProtocolOpt, registry_extension::proxy::RegistryOpt}};
 
 use self::{registry_extension::Registry, protocol_extension::Protocol, cluster_extension::Cluster, load_balance_extension::LoadBalance, router_extension::Router};
 
@@ -201,7 +201,7 @@ impl ExtensionDirectory {
 
     async fn load_protocol_extension(&mut self, url: Url, tx: oneshot::Sender<protocol_extension::proxy::ProtocolProxy>) {
         debug!("load protocol extension, url: {}", url);
-        let extension = url.query::<Extension>();
+        let extension = url.query::<ExtensionName>();
         match extension {
             None => {
                 error!("load protocol extension error: extension not found, url: {}", url);
@@ -260,7 +260,7 @@ impl ExtensionDirectory {
 
     async fn load_registry_extension(&mut self, url: Url, tx: oneshot::Sender<registry_extension::proxy::RegistryProxy>) {
         debug!("load registry extension, url: {}", url);
-        let extension = url.query::<Extension>();
+        let extension = url.query::<ExtensionName>();
         match extension {
             None => {
                 error!("load registry extension error: extension not found, url: {}", url);
@@ -323,7 +323,7 @@ impl ExtensionDirectory {
 
     async fn load_cluster_extension(&mut self, url: Url, tx: oneshot::Sender<cluster_extension::proxy::ClusterProxy>) {
         debug!("load cluster extension, url: {}", url);
-        let extension = url.query::<Extension>();
+        let extension = url.query::<ExtensionName>();
         match extension {
             None => {
                 error!("load cluster extension error: extension not found, url: {}", url);
@@ -374,7 +374,7 @@ impl ExtensionDirectory {
 
     async fn load_load_balance_extension(&mut self, url: Url, tx: oneshot::Sender<load_balance_extension::proxy::LoadBalanceProxy>) {
         debug!("load load balance extension, url: {}", url);
-        let extension = url.query::<Extension>();
+        let extension = url.query::<ExtensionName>();
         match extension {
             None => {
                 error!("load load balance extension error: extension not found, url: {}", url);
@@ -425,7 +425,7 @@ impl ExtensionDirectory {
 
     async fn load_router_extension(&mut self, url: Url, tx: oneshot::Sender<router_extension::proxy::RouterProxy>) {
         debug!("load router extension, url: {}", url);
-        let extension = url.query::<Extension>();
+        let extension = url.query::<ExtensionName>();
         match extension {
             None => {
                 error!("load router extension error: extension not found, url: {}", url);

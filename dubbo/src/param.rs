@@ -358,14 +358,14 @@ impl FromStr for ReferenceUrl {
     }
 }
 
-pub struct Extension(String);
+pub struct ExtensionName(String);
 
-impl Param for Extension {
+impl Param for ExtensionName {
 
     type TargetType = String;
 
     fn name() -> &'static str {
-        "extension"
+        "extensionName"
     }
 
     fn value(&self) -> Self::TargetType {
@@ -377,10 +377,10 @@ impl Param for Extension {
     }
 }
 
-impl FromStr for Extension {
+impl FromStr for ExtensionName {
     type Err = StdError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Extension(s.to_owned()))
+        Ok(ExtensionName(s.to_owned()))
     }
 }
