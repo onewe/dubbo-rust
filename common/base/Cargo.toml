@@ -7,5 +7,5 @@ edition = "2021"
 
 [dependencies]
 urlencoding.workspace = true
-http = "0.2"
+url.workspace = true
 dubbo-logger.workspace = true

@@ -32,6 +32,7 @@ pub mod status;
 pub mod svc;
 pub mod triple;
 pub mod utils;
+pub mod extension;
 
 use http_body::Body;
 use std::{future::Future, pin::Pin};
