@@ -61,16 +61,18 @@ impl RegistryProtocol {
     }
 
     pub fn get_registry(&mut self, url: Url) -> ArcRegistry {
-        let mem = StaticRegistry::default();
-        let mem = ArcRegistry::new(mem);
-        self.registries
-            .as_ref()
-            .unwrap()
-            .lock()
-            .unwrap()
-            .insert(url.location, mem.clone());
+        // let mem = StaticRegistry::default();
+        // let mem = ArcRegistry::new(mem);
+        // self.registries
+        //     .as_ref()
+        //     .unwrap()
+        //     .lock()
+        //     .unwrap()
+        //     .insert(url.location, mem.clone());
 
-        mem
+        // mem
+
+        todo!()
     }
 }
 
@@ -88,26 +90,28 @@ impl Protocol for RegistryProtocol {
         // init Exporter based on provider_url
         // server registry based on register_url
         // start server health check
-        let registry_url = self.services.get(url.get_service_name().as_str());
-        if let Some(urls) = registry_url {
-            for url in urls.clone().iter() {
-                if !url.service_key.is_empty() {
-                    let reg = self.get_registry(url.clone());
-                    let _ = reg.register(url.clone()).await;
-                }
-            }
-        }
+        // let registry_url = self.services.get(url.get_service_name().as_str());
+        // if let Some(urls) = registry_url {
+        //     for url in urls.clone().iter() {
+        //         if !url.service_key.is_empty() {
+        //             let reg = self.get_registry(url.clone());
+        //             let _ = reg.register(url.clone()).await;
+        //         }
+        //     }
+        // }
 
-        match url.clone().scheme.as_str() {
-            "tri" => {
-                let pro = Box::new(TripleProtocol::new());
-                return pro.export(url).await;
-            }
-            _ => {
-                tracing::error!("base {:?} not implemented", url.scheme);
-                Box::new(TripleExporter::new())
-            }
-        }
+        // match url.clone().scheme.as_str() {
+        //     "tri" => {
+        //         let pro = Box::new(TripleProtocol::new());
+        //         return pro.export(url).await;
+        //     }
+        //     _ => {
+        //         tracing::error!("base {:?} not implemented", url.scheme);
+        //         Box::new(TripleExporter::new())
+        //     }
+        // }
+
+        todo!()
     }
 
     async fn refer(self, url: Url) -> Self::Invoker {

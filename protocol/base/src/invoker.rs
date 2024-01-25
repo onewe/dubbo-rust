@@ -66,9 +66,6 @@ impl Node for BaseInvoker {
 impl Display for BaseInvoker {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Invoker")
-            .field("protocol", &self.url.scheme)
-            .field("host", &self.url.ip)
-            .field("path", &self.url.location)
             .finish()
     }
 }

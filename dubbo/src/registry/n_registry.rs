@@ -102,95 +102,103 @@ impl Registry for RegistryComponent {
 
 impl StaticRegistry {
     pub fn new(urls: Vec<Url>) -> Self {
-        let mut map = HashMap::with_capacity(urls.len());
+        // let mut map = HashMap::with_capacity(urls.len());
 
-        for url in urls {
-            let service_name = url.get_service_name();
-            let static_values = map
-                .entry(service_name)
-                .or_insert_with(|| StaticServiceValues {
-                    listeners: Vec::new(),
-                    urls: HashSet::new(),
-                });
-            let url = url.to_string();
-            static_values.urls.insert(url.clone());
-        }
+        // for url in urls {
+        //     let service_name = url.get_service_name();
+        //     let static_values = map
+        //         .entry(service_name)
+        //         .or_insert_with(|| StaticServiceValues {
+        //             listeners: Vec::new(),
+        //             urls: HashSet::new(),
+        //         });
+        //     let url = url.to_string();
+        //     static_values.urls.insert(url.clone());
+        // }
 
-        Self {
-            urls: Mutex::new(map),
-        }
+        // Self {
+        //     urls: Mutex::new(map),
+        // }
+
+        todo!()
     }
 }
 
 #[async_trait]
 impl Registry for StaticRegistry {
     async fn register(&self, url: Url) -> Result<(), StdError> {
-        let service_name = url.get_service_name();
-        let mut lock = self.urls.lock().await;
+        // let service_name = url.get_service_name();
+        // let mut lock = self.urls.lock().await;
 
-        let static_values = lock
-            .entry(service_name)
-            .or_insert_with(|| StaticServiceValues {
-                listeners: Vec::new(),
-                urls: HashSet::new(),
-            });
-        let url = url.to_string();
-        static_values.urls.insert(url.clone());
+        // let static_values = lock
+        //     .entry(service_name)
+        //     .or_insert_with(|| StaticServiceValues {
+        //         listeners: Vec::new(),
+        //         urls: HashSet::new(),
+        //     });
+        // let url = url.to_string();
+        // static_values.urls.insert(url.clone());
 
-        static_values.listeners.retain(|listener| {
-            let ret = listener.try_send(Ok(ServiceChange::Insert(url.clone(), ())));
-            ret.is_ok()
-        });
+        // static_values.listeners.retain(|listener| {
+        //     let ret = listener.try_send(Ok(ServiceChange::Insert(url.clone(), ())));
+        //     ret.is_ok()
+        // });
 
-        Ok(())
+        // Ok(())
+
+        todo!()
     }
 
     async fn unregister(&self, url: Url) -> Result<(), StdError> {
-        let service_name = url.get_service_name();
-        let mut lock = self.urls.lock().await;
+        // let service_name = url.get_service_name();
+        // let mut lock = self.urls.lock().await;
 
-        match lock.get_mut(&service_name) {
-            None => Ok(()),
-            Some(static_values) => {
-                let url = url.to_string();
-                static_values.urls.remove(&url);
-                static_values.listeners.retain(|listener| {
-                    let ret = listener.try_send(Ok(ServiceChange::Remove(url.clone())));
-                    ret.is_ok()
-                });
-                if static_values.urls.is_empty() {
-                    lock.remove(&service_name);
-                }
-                Ok(())
-            }
-        }
+        // match lock.get_mut(&service_name) {
+        //     None => Ok(()),
+        //     Some(static_values) => {
+        //         let url = url.to_string();
+        //         static_values.urls.remove(&url);
+        //         static_values.listeners.retain(|listener| {
+        //             let ret = listener.try_send(Ok(ServiceChange::Remove(url.clone())));
+        //             ret.is_ok()
+        //         });
+        //         if static_values.urls.is_empty() {
+        //             lock.remove(&service_name);
+        //         }
+        //         Ok(())
+        //     }
+        // }
+
+        todo!()
     }
 
     async fn subscribe(&self, url: Url) -> Result<DiscoverStream, StdError> {
-        let service_name = url.get_service_name();
+        // let service_name = url.get_service_name();
 
-        let change_rx = {
-            let mut lock = self.urls.lock().await;
-            let static_values = lock
-                .entry(service_name)
-                .or_insert_with(|| StaticServiceValues {
-                    listeners: Vec::new(),
-                    urls: HashSet::new(),
-                });
+        // let change_rx = {
+        //     let mut lock = self.urls.lock().await;
+        //     let static_values = lock
+        //         .entry(service_name)
+        //         .or_insert_with(|| StaticServiceValues {
+        //             listeners: Vec::new(),
+        //             urls: HashSet::new(),
+        //         });
 
-            let (tx, change_rx) = mpsc::channel(64);
-            static_values.listeners.push(tx);
+        //     let (tx, change_rx) = mpsc::channel(64);
+        //     static_values.listeners.push(tx);
 
-            for url in static_values.urls.iter() {
-                static_values.listeners.retain(|listener| {
-                    let ret = listener.try_send(Ok(ServiceChange::Insert(url.clone(), ())));
-                    ret.is_ok()
-                });
-            }
-            change_rx
-        };
+        //     for url in static_values.urls.iter() {
+        //         static_values.listeners.retain(|listener| {
+        //             let ret = listener.try_send(Ok(ServiceChange::Insert(url.clone(), ())));
+        //             ret.is_ok()
+        //         });
+        //     }
+        //     change_rx
+        // };
 
-        Ok(change_rx)
+        // Ok(change_rx)
+
+        todo!()
     }
 
     async fn unsubscribe(&self, url: Url) -> Result<(), StdError> {

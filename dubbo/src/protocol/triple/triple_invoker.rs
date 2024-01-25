@@ -35,11 +35,12 @@ pub struct TripleInvoker {
 
 impl TripleInvoker {
     pub fn new(url: Url) -> TripleInvoker {
-        let uri = http::Uri::from_str(&url.to_url()).unwrap();
-        Self {
-            url,
-            conn: Connection::new().with_host(uri).build(),
-        }
+        // let uri = http::Uri::from_str(&url.to_url()).unwrap();
+        // Self {
+        //     url,
+        //     conn: Connection::new().with_host(uri).build(),
+        // }
+        todo!()
     }
 }
 
@@ -51,68 +52,71 @@ impl Debug for TripleInvoker {
 
 impl TripleInvoker {
     pub fn map_request(&self, req: http::Request<CloneBody>) -> http::Request<CloneBody> {
-        let (parts, body) = req.into_parts();
 
-        let path_and_query = parts.headers.get("path").unwrap().to_str().unwrap();
+        // todo
+        // let (parts, body) = req.into_parts();
 
-        let authority = self.url.clone().get_ip_port();
+        // let path_and_query = parts.headers.get("path").unwrap().to_str().unwrap();
 
-        let uri = Uri::builder()
-            .scheme("http")
-            .authority(authority)
-            .path_and_query(path_and_query)
-            .build()
-            .unwrap();
+        // let authority = self.url.clone().get_ip_port();
 
-        let mut req = hyper::Request::builder()
-            .version(http::Version::HTTP_2)
-            .uri(uri.clone())
-            .method("POST")
-            .body(body)
-            .unwrap();
+        // let uri = Uri::builder()
+        //     .scheme("http")
+        //     .authority(authority)
+        //     .path_and_query(path_and_query)
+        //     .build()
+        //     .unwrap();
 
-        // *req.version_mut() = http::Version::HTTP_2;
-        req.headers_mut()
-            .insert("method", HeaderValue::from_static("POST"));
-        req.headers_mut().insert(
-            "scheme",
-            HeaderValue::from_str(uri.scheme_str().unwrap()).unwrap(),
-        );
-        req.headers_mut()
-            .insert("path", HeaderValue::from_str(uri.path()).unwrap());
-        req.headers_mut().insert(
-            "authority",
-            HeaderValue::from_str(uri.authority().unwrap().as_str()).unwrap(),
-        );
-        req.headers_mut().insert(
-            "content-type",
-            HeaderValue::from_static("application/grpc+proto"),
-        );
-        req.headers_mut()
-            .insert("user-agent", HeaderValue::from_static("dubbo-rust/0.1.0"));
-        req.headers_mut()
-            .insert("te", HeaderValue::from_static("trailers"));
-        req.headers_mut().insert(
-            "tri-service-version",
-            HeaderValue::from_static("dubbo-rust/0.1.0"),
-        );
-        req.headers_mut()
-            .insert("tri-service-group", HeaderValue::from_static("cluster"));
-        req.headers_mut().insert(
-            "tri-unit-info",
-            HeaderValue::from_static("dubbo-rust/0.1.0"),
-        );
-        // if let Some(_encoding) = self.send_compression_encoding {
+        // let mut req = hyper::Request::builder()
+        //     .version(http::Version::HTTP_2)
+        //     .uri(uri.clone())
+        //     .method("POST")
+        //     .body(body)
+        //     .unwrap();
 
-        // }
+        // // *req.version_mut() = http::Version::HTTP_2;
+        // req.headers_mut()
+        //     .insert("method", HeaderValue::from_static("POST"));
+        // req.headers_mut().insert(
+        //     "scheme",
+        //     HeaderValue::from_str(uri.scheme_str().unwrap()).unwrap(),
+        // );
+        // req.headers_mut()
+        //     .insert("path", HeaderValue::from_str(uri.path()).unwrap());
+        // req.headers_mut().insert(
+        //     "authority",
+        //     HeaderValue::from_str(uri.authority().unwrap().as_str()).unwrap(),
+        // );
+        // req.headers_mut().insert(
+        //     "content-type",
+        //     HeaderValue::from_static("application/grpc+proto"),
+        // );
+        // req.headers_mut()
+        //     .insert("user-agent", HeaderValue::from_static("dubbo-rust/0.1.0"));
+        // req.headers_mut()
+        //     .insert("te", HeaderValue::from_static("trailers"));
+        // req.headers_mut().insert(
+        //     "tri-service-version",
+        //     HeaderValue::from_static("dubbo-rust/0.1.0"),
+        // );
+        // req.headers_mut()
+        //     .insert("tri-service-group", HeaderValue::from_static("cluster"));
+        // req.headers_mut().insert(
+        //     "tri-unit-info",
+        //     HeaderValue::from_static("dubbo-rust/0.1.0"),
+        // );
+        // // if let Some(_encoding) = self.send_compression_encoding {
 
-        req.headers_mut()
-            .insert("grpc-encoding", http::HeaderValue::from_static("gzip"));
+        // // }
 
-        req.headers_mut().insert(
-            "grpc-accept-encoding",
-            http::HeaderValue::from_static("gzip"),
-        );
+        // req.headers_mut()
+        //     .insert("grpc-encoding", http::HeaderValue::from_static("gzip"));
+
+        // req.headers_mut().insert(
+        //     "grpc-accept-encoding",
+        //     http::HeaderValue::from_static("gzip"),
+        // );
+
 
         // // const (
         // //     TripleContentType    = "application/grpc+proto"

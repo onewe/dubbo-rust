@@ -72,44 +72,45 @@ impl Dubbo {
     }
 
     pub fn init(&mut self) -> Result<(), Box<dyn Error>> {
-        if self.config.is_none() {
-            self.config = Some(get_global_config())
-        }
+        //TODO
+        // if self.config.is_none() {
+        //     self.config = Some(get_global_config())
+        // }
 
-        let root_config = self.config.as_ref().unwrap();
-        tracing::debug!("global conf: {:?}", root_config);
-        // env::set_var("ZOOKEEPER_SERVERS",root_config);
-        for (_, service_config) in root_config.provider.services.iter() {
-            tracing::info!("init service name: {}", service_config.interface);
-            let url = if root_config
-                .protocols
-                .contains_key(service_config.protocol.as_str())
-            {
-                let protocol = root_config
-                    .protocols
-                    .get_protocol_or_default(service_config.protocol.as_str());
-                let protocol_url =
-                    format!("{}/{}", protocol.to_url(), service_config.interface.clone(),);
-                tracing::info!("protocol_url: {:?}", protocol_url);
-                Url::from_url(&protocol_url)
-            } else {
-                return Err(format!("base {:?} not exists", service_config.protocol).into());
-            };
-            tracing::info!("url: {:?}", url);
-            if url.is_none() {
-                continue;
-            }
-            let u = url.unwrap();
-            if self.protocols.get(&service_config.protocol).is_some() {
-                self.protocols
-                    .get_mut(&service_config.protocol)
-                    .unwrap()
-                    .push(u);
-            } else {
-                self.protocols
-                    .insert(service_config.protocol.clone(), vec![u]);
-            }
-        }
+        // let root_config = self.config.as_ref().unwrap();
+        // tracing::debug!("global conf: {:?}", root_config);
+        // // env::set_var("ZOOKEEPER_SERVERS",root_config);
+        // for (_, service_config) in root_config.provider.services.iter() {
+        //     tracing::info!("init service name: {}", service_config.interface);
+        //     let url = if root_config
+        //         .protocols
+        //         .contains_key(service_config.protocol.as_str())
+        //     {
+        //         let protocol = root_config
+        //             .protocols
+        //             .get_protocol_or_default(service_config.protocol.as_str());
+        //         let protocol_url =
+        //             format!("{}/{}", protocol.to_url(), service_config.interface.clone(),);
+        //         tracing::info!("protocol_url: {:?}", protocol_url);
+        //         Url::from_url(&protocol_url)
+        //     } else {
+        //         return Err(format!("base {:?} not exists", service_config.protocol).into());
+        //     };
+        //     tracing::info!("url: {:?}", url);
+        //     if url.is_none() {
+        //         continue;
+        //     }
+        //     let u = url.unwrap();
+        //     if self.protocols.get(&service_config.protocol).is_some() {
+        //         self.protocols
+        //             .get_mut(&service_config.protocol)
+        //             .unwrap()
+        //             .push(u);
+        //     } else {
+        //         self.protocols
+        //             .insert(service_config.protocol.clone(), vec![u]);
+        //     }
+        // }
         Ok(())
     }
 

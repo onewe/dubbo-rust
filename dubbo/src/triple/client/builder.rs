@@ -56,16 +56,7 @@ impl ClientBuilder {
     }
 
     pub fn from_static(host: &str) -> ClientBuilder {
-        Self {
-            timeout: None,
-            connector: "",
-            registry: Some(ArcRegistry::new(StaticRegistry::new(vec![Url::from_url(
-                host,
-            )
-            .unwrap()]))),
-            direct: true,
-            host: host.to_string(),
-        }
+        todo!()
     }
 
     pub fn with_timeout(self, timeout: u64) -> Self {
@@ -83,13 +74,7 @@ impl ClientBuilder {
     }
 
     pub fn with_host(self, host: &'static str) -> Self {
-        Self {
-            registry: Some(ArcRegistry::new(StaticRegistry::new(vec![Url::from_url(
-                host,
-            )
-            .unwrap()]))),
-            ..self
-        }
+      todo!()
     }
 
     pub fn with_connector(self, connector: &'static str) -> Self {

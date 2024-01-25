@@ -20,7 +20,6 @@ use std::{io::ErrorKind, pin::Pin};
 use async_trait::async_trait;
 use dubbo_base::Url;
 use futures_util::{Stream, StreamExt};
-use registry_nacos::NacosRegistry;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 
@@ -34,8 +33,6 @@ use protos::{
     greeter_server::{register_server, Greeter},
     GreeterReply, GreeterRequest,
 };
-use registry_zookeeper::ZookeeperRegistry;
-
 pub mod protos {
     #![allow(non_camel_case_types)]
     include!(concat!(env!("OUT_DIR"), "/org.apache.dubbo.sample.tri.rs"));
@@ -59,12 +56,12 @@ async fn main() {
         Err(_err) => panic!("err: {:?}", _err), // response was droped
     };
 
-    let nacos_registry = NacosRegistry::new(Url::from_url("nacos://127.0.0.1:8848").unwrap());
-    let mut f = Dubbo::new()
-        .with_config(r)
-        .add_registry("nacos-registry", ArcRegistry::new(nacos_registry));
+    // let nacos_registry = NacosRegistry::new(Url::from_url("nacos://127.0.0.1:8848").unwrap());
+    // let mut f = Dubbo::new()
+    //     .with_config(r)
+    //     .add_registry("nacos-registry", ArcRegistry::new(nacos_registry));
 
-    f.start().await;
+    // f.start().await;
 }
 
 #[allow(dead_code)]

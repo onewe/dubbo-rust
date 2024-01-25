@@ -49,13 +49,14 @@ pub struct ExchangeClient {
 
 impl ExchangeClient {
     pub fn new(url: Url, client: BoxedClient, connection_timeout: Duration) -> Self {
-        ExchangeClient {
-            connection_timeout,
-            address: url.get_ip_port(),
-            client: None,
-            init: AtomicBool::new(false),
-            active: AtomicI32::new(0),
-        }
+        // ExchangeClient {
+        //     connection_timeout,
+        //     address: url.get_ip_port(),
+        //     client: None,
+        //     init: AtomicBool::new(false),
+        //     active: AtomicI32::new(0),
+        // }
+        todo!()
     }
 }
 

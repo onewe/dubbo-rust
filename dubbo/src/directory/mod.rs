@@ -162,33 +162,34 @@ where
 
         let (tx, rx) = channel(Self::MAX_DIRECTORY_BUFFER_SIZE);
 
-        tokio::spawn(async move {
-            // todo use dubbo url model generate subscribe url
-            // category:serviceInterface:version:group
-            let consumer_url = format!("consumer://{}/{}", "127.0.0.1:8888", service_name);
-            let subscribe_url = Url::from_url(&consumer_url).unwrap();
-            let receiver = registry.subscribe(subscribe_url).await;
-            debug!("discover start!");
-            match receiver {
-                Err(_e) => {
-                    // error!("discover stream error: {}", e);
-                    debug!("discover stream error");
-                }
-                Ok(mut receiver) => loop {
-                    let change = receiver.recv().await;
-                    debug!("receive change: {:?}", change);
-                    match change {
-                        None => {
-                            debug!("discover stream closed.");
-                            break;
-                        }
-                        Some(change) => {
-                            let _ = tx.send(change).await;
-                        }
-                    }
-                },
-            }
-        });
+        // TODO
+        // tokio::spawn(async move {
+        //     // todo use dubbo url model generate subscribe url
+        //     // category:serviceInterface:version:group
+        //     let consumer_url = format!("consumer://{}/{}", "127.0.0.1:8888", service_name);
+        //     let subscribe_url = Url::from_url(&consumer_url).unwrap();
+        //     let receiver = registry.subscribe(subscribe_url).await;
+        //     debug!("discover start!");
+        //     match receiver {
+        //         Err(_e) => {
+        //             // error!("discover stream error: {}", e);
+        //             debug!("discover stream error");
+        //         }
+        //         Ok(mut receiver) => loop {
+        //             let change = receiver.recv().await;
+        //             debug!("receive change: {:?}", change);
+        //             match change {
+        //                 None => {
+        //                     debug!("discover stream closed.");
+        //                     break;
+        //                 }
+        //                 Some(change) => {
+        //                     let _ = tx.send(change).await;
+        //                 }
+        //             }
+        //         },
+        //     }
+        // });
 
         Buffer::new(
             Directory::new(ReceiverStream::new(rx)),

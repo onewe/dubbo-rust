@@ -132,23 +132,6 @@ impl ServerBuilder {
 
 impl From<Url> for ServerBuilder {
     fn from(u: Url) -> Self {
-        let uri = match http::Uri::from_str(&u.raw_url_string()) {
-            Ok(v) => v,
-            Err(err) => {
-                tracing::error!("http uri parse error: {}, url: {:?}", err, &u);
-                Uri::default()
-            }
-        };
-
-        let authority = uri.authority().unwrap();
-
-        Self {
-            listener: u.get_param("listener").unwrap_or("tcp".to_string()),
-            addr: authority.to_string().to_socket_addrs().unwrap().next(),
-            service_names: vec![u.service_name],
-            server: DubboServer::default(),
-            certs: Vec::new(),
-            keys: Vec::new(),
-        }
+        todo!()
     }
 }

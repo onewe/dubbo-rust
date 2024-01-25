@@ -16,7 +16,7 @@
  */
 
 use std::{
-    collections::HashMap, fmt::{Display, Formatter, Debug}, str::FromStr
+    borrow::Cow, collections::HashMap, fmt::{Display, Formatter, Debug}, str::FromStr
 };
 
 use crate::constants::{GROUP_KEY, INTERFACE_KEY, VERSION_KEY};
@@ -58,7 +58,7 @@ impl Url {
         self.inner.path()
     }
 
-    pub fn query<T: Param>(&self) -> Option<T> {
+    pub fn query<T: UrlParam>(&self) -> Option<T> {
         self.inner.query_pairs()
             .find(|(k, _)| k == T::name())
             .map(|(_, v)| T::from_str(&v).ok())
@@ -91,7 +91,7 @@ impl Url {
         let _ = self.inner.set_path(path);
     }
 
-    pub fn add_query_param<T: Param>(&mut self, param: T) {
+    pub fn add_query_param<T: UrlParam>(&mut self, param: T) {
         let mut pairs = self.inner.query_pairs_mut();
         pairs.append_pair(T::name(), &param.as_str());
     }
@@ -142,4 +142,16 @@ impl From<Url> for String {
     fn from(url: Url) -> Self {
         url.inner.into()
     }
+}
+
+
+pub trait UrlParam: FromStr {
+
+    type TargetType;
+
+    fn name() -> &'static str;
+
+    fn value(&self) -> Self::TargetType;
+
+    fn as_str<'a>(&'a self) -> Cow<'a, str>;  
 }
