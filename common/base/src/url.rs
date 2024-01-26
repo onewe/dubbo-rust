@@ -19,8 +19,6 @@ use std::{
     borrow::Cow, collections::HashMap, fmt::{Display, Formatter, Debug}, str::FromStr
 };
 
-use crate::constants::{GROUP_KEY, INTERFACE_KEY, VERSION_KEY};
-
 #[derive(Clone)]
 pub struct Url {
     inner: url::Url,
