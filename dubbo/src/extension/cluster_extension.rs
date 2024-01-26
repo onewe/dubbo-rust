@@ -13,7 +13,7 @@ pub trait Cluster {
 
 
 
-pub mod proxy {
+pub(crate) mod proxy {
 
     use async_trait::async_trait;
     use dubbo_logger::tracing::error;
@@ -28,7 +28,7 @@ pub mod proxy {
     }
 
     #[derive(Clone)]
-    pub struct ClusterProxy {
+    pub(crate) struct ClusterProxy {
         sender: tokio::sync::mpsc::Sender<ClusterOpt>,
     }
 
@@ -89,14 +89,14 @@ pub mod proxy {
             ClusterProxy::new(sender)
         }
     }
-
+ 
     #[derive(Error, Debug)]
     #[error("{0}")]
-    pub struct ClusterProxyError(String);
+    pub(crate) struct ClusterProxyError(String);
 
     impl ClusterProxyError {
 
-        pub fn new(msg: &str) -> Self {
+        pub(crate) fn new(msg: &str) -> Self {
             ClusterProxyError(msg.to_string())
         }
     }

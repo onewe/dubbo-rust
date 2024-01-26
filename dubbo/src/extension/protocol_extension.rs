@@ -12,7 +12,7 @@ pub trait Protocol {
     async fn refer(&mut self, url: Url) -> Result<Box<dyn Invoker + Send>, StdError>;
 }
 
-pub mod proxy {
+pub(crate) mod proxy {
 
     use async_trait::async_trait;
     use dubbo_base::Url;
@@ -30,7 +30,7 @@ pub mod proxy {
     }
 
     #[derive(Clone)]
-    pub struct ProtocolProxy {
+    pub(crate) struct ProtocolProxy {
         sender: tokio::sync::mpsc::Sender<ProtocolOpt>,
     }
 
@@ -119,11 +119,11 @@ pub mod proxy {
 
     #[derive(Error, Debug)]
     #[error("{0}")]
-    pub struct ProtocolProxyError(String);
+    pub(crate) struct ProtocolProxyError(String);
 
     impl ProtocolProxyError {
 
-        pub fn new(msg: &str) -> Self {
+        pub(crate) fn new(msg: &str) -> Self {
             ProtocolProxyError(msg.to_string())
         }
     }

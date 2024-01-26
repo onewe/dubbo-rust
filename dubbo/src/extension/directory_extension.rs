@@ -11,7 +11,7 @@ pub trait InvokerDirectory {
 }
 
 
-pub mod proxy {
+pub(crate) mod proxy {
     use thiserror::Error;
     use tokio::sync::oneshot;
     use dubbo_logger::tracing::error;
@@ -26,7 +26,7 @@ pub mod proxy {
     }
 
     #[derive(Clone)]
-    pub struct InvokerDirectoryProxy {
+    pub(crate) struct InvokerDirectoryProxy {
         sender: tokio::sync::mpsc::Sender<InvokerDirectoryOpt>,
     }
 
@@ -89,10 +89,10 @@ pub mod proxy {
 
     #[derive(Error, Debug)]
     #[error("{0}")]
-    pub struct InvokerDirectoryProxyError(String);
+    pub(crate) struct InvokerDirectoryProxyError(String);
 
     impl InvokerDirectoryProxyError {
-        pub fn new(message: &str) -> Self {
+        pub(crate) fn new(message: &str) -> Self {
             InvokerDirectoryProxyError(message.to_string())
         }
     }

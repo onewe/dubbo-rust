@@ -19,7 +19,7 @@ pub trait Registry {
 }
 
 
-pub mod proxy {
+pub(crate) mod proxy {
 
     use std::collections::HashSet;
 
@@ -41,7 +41,7 @@ pub mod proxy {
     }
 
     #[derive(Clone)]
-    pub struct RegistryProxy {
+    pub(crate) struct RegistryProxy {
         sender: tokio::sync::mpsc::Sender<RegistryOpt>,
     }
 
@@ -153,11 +153,11 @@ pub mod proxy {
 
     #[derive(Error, Debug)]
     #[error("registry proxy error: {0}")]
-    pub struct RegistryProxyError(String);
+    pub(crate) struct RegistryProxyError(String);
 
     impl RegistryProxyError {
 
-        pub fn new(msg: &str) -> Self {
+        pub(crate) fn new(msg: &str) -> Self {
             RegistryProxyError(msg.to_string())
         }
     }

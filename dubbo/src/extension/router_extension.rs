@@ -9,7 +9,7 @@ pub trait Router {
 }
 
 
-pub mod proxy {
+pub(crate) mod proxy {
 
     use async_trait::async_trait;
     use dubbo_logger::tracing::error;
@@ -24,7 +24,7 @@ pub mod proxy {
     }
 
     #[derive(Clone)]
-    pub struct RouterProxy {
+    pub(crate) struct RouterProxy {
         sender: tokio::sync::mpsc::Sender<RouterOpt>,
     }
 
@@ -85,10 +85,10 @@ pub mod proxy {
 
     #[derive(Error, Debug)]
     #[error("{0}")]
-    pub struct RouterProxyError(String);
+    pub(crate) struct RouterProxyError(String);
 
     impl RouterProxyError {
-        pub fn new(msg: &str) -> Self {
+        pub(crate) fn new(msg: &str) -> Self {
             RouterProxyError(msg.to_string())
         }
     }

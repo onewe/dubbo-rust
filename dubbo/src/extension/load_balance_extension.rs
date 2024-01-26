@@ -10,7 +10,7 @@ pub trait LoadBalance {
     
 }
 
-pub mod proxy {
+pub(crate) mod proxy {
 
     use async_trait::async_trait;
     use dubbo_logger::tracing::error;
@@ -25,7 +25,7 @@ pub mod proxy {
     }
 
     #[derive(Clone)]
-    pub struct LoadBalanceProxy {
+    pub(crate) struct LoadBalanceProxy {
         sender: tokio::sync::mpsc::Sender<LoadBalanceOpt>,
     }
 
@@ -89,10 +89,10 @@ pub mod proxy {
 
     #[derive(Error, Debug)]
     #[error("{0}")]
-    pub struct LoadBalanceProxyError(String);
+    pub(crate) struct LoadBalanceProxyError(String);
 
     impl LoadBalanceProxyError {
-        pub fn new(msg: &str) -> Self {
+        pub(crate) fn new(msg: &str) -> Self {
             LoadBalanceProxyError(msg.to_string())
         }
     }
