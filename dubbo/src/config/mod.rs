@@ -1,2 +1,2 @@
-mod reference_config;
-mod registry_config;
+pub mod reference_config;
+pub mod registry_config;

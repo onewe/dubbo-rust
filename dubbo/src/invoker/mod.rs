@@ -2,21 +2,23 @@ use std::fmt::Display;
 
 use bytes::Bytes;
 use dubbo_base::Url;
-use futures_core::Stream;
+use futures::Stream;
+use thiserror::Error;
 
-use crate::{codegen::TripleInvoker, invoker::clone_invoker::CloneInvoker, svc::NewService, StdError};
+use crate::StdError;
 
+pub mod cloneable_invoker;
 
 
 pub trait Serializable: Display {
 
-    fn serialize(&self) -> Result<Box<dyn Stream<Item = Bytes>>, StdError>;
+    fn serialize(&self) -> Result<Box<dyn Stream<Item = Bytes> + Send>, StdError>;
 }
 
 
 pub trait Deserializable {
     
-    fn deserialize<T>(&self, data: Box<dyn Stream<Item = Bytes>>) -> Result<T, StdError>;
+    fn deserialize<T>(&self, data: Box<dyn Stream<Item = Bytes> + Send>) -> Result<T, StdError>;
 }
 
 
@@ -50,7 +52,7 @@ impl Argument {
 
 pub struct RpcResponse {
     
-    data: Box<dyn Stream<Item = Bytes>>,
+    data: Box<dyn Stream<Item = Bytes> + Send>,
 }
 
 
@@ -129,5 +131,17 @@ pub trait Invoker {
     async fn invoke(&mut self, invocation: RpcInvocation) -> Result<RpcResponse, StdError>;
 
     fn url(&self) -> &Url;
+    
+}
+
+
+#[derive(Error, Debug)]
+#[error("invoke error: {0}")]
+pub struct InvokeError(String);
+
+impl InvokeError {   
+    pub fn new(msg: String) -> Self {
+        Self(msg)
+    }
     
 }

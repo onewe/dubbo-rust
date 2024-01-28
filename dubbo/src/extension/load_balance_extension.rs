@@ -13,7 +13,7 @@ pub trait LoadBalance {
 pub(crate) mod proxy {
 
     use async_trait::async_trait;
-    use dubbo_logger::tracing::error;
+    use tracing::error;
     use thiserror::Error;
     use tokio::sync::oneshot;
     use crate::{invoker::Invoker, StdError};

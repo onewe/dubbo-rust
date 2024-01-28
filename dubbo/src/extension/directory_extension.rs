@@ -14,7 +14,7 @@ pub trait InvokerDirectory {
 pub(crate) mod proxy {
     use thiserror::Error;
     use tokio::sync::oneshot;
-    use dubbo_logger::tracing::error;
+    use tracing::error;
     use async_trait::async_trait;
 
     use crate::{invoker::Invoker, StdError};

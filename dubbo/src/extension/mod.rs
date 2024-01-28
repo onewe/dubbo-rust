@@ -3,7 +3,7 @@ use std::{collections::HashMap, str::FromStr};
 use self::{cluster_extension::{proxy::ClusterProxy, Cluster}, directory_extension::{proxy::InvokerDirectoryProxy, InvokerDirectory}, load_balance_extension::{proxy::LoadBalanceProxy, LoadBalance}, protocol_extension::{proxy::ProtocolProxy, Protocol}, registry_extension::{proxy::RegistryProxy, Registry}, router_extension::{proxy::RouterProxy, Router}};
 use crate::StdError;
 use dubbo_base::{url::UrlParam, Url};
-use dubbo_logger::tracing::{debug, error};
+use tracing::{debug, error};
 use thiserror::Error;
 use tokio::sync::oneshot;
 
@@ -362,10 +362,10 @@ impl ExtensionDirectoryCommander {
         }
     }
 
-    pub(crate) async fn add_directory_extension_loader(&self, loader: Box<dyn InvokerDirectoryExtensionLoader + Send>) -> Result<(), StdError> {
+    pub(crate) async fn add_invoker_directory_extension_loader(&self, loader: Box<dyn InvokerDirectoryExtensionLoader + Send>) -> Result<(), StdError> {
         match self.sender.send(ExtensionOpt::AddInvokerDirectoryExtensionLoader(loader)).await {
             Ok(_) => Ok(()),
-            Err(_) => Err(AddExtensionLoaderError::new("add directory extension loader failed").into()),
+            Err(_) => Err(AddExtensionLoaderError::new("add invoker directory extension loader failed").into()),
         }
     }
 
@@ -404,10 +404,10 @@ impl ExtensionDirectoryCommander {
         }
     }
 
-    pub(crate) async fn remove_directory_extension_loader(&self, name: &str) -> Result<(), StdError> {
+    pub(crate) async fn remove_invoker_directory_extension_loader(&self, name: &str) -> Result<(), StdError> {
         match self.sender.send(ExtensionOpt::RemoveInvokerDirectoryExtensionLoader(name.to_string())).await {
             Ok(_) => Ok(()),
-            Err(_) => Err(RemoveExtensionLoaderError::new("remove directory extension loader failed").into()),
+            Err(_) => Err(RemoveExtensionLoaderError::new("remove invoker directory extension loader failed").into()),
         }
     }
 

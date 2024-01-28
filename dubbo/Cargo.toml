@@ -16,4 +16,5 @@ async-trait.workspace = true
 bytes.workspace = true
 dubbo-base.workspace = true
 once_cell.workspace = true
-thiserror = "1.0.48"
+thiserror.workspace = true
+tracing.workspace = true
