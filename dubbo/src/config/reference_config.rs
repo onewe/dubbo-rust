@@ -20,13 +20,13 @@ impl ReferenceConfig {
         
         let mut url = Url::empty();
         let ServiceMetadata {
-            service_name,
+            interface_name,
             method_names,
         } = T::service_metadata();
 
         url.set_protocol("reference");
-        url.add_query_param(InterfaceName::new(service_name));
-        url.add_query_param(InterfaceTypeId::new(T::type_id()));
+        url.add_query_param(InterfaceName::new(interface_name));
+        url.add_query_param(RustTypeName::new(std::any::type_name::<T>().to_string()));
         url.add_query_param(MethodNames::new(method_names));
      
         
@@ -76,21 +76,21 @@ impl FromStr for InterfaceName {
     }
 }
 
-pub struct InterfaceTypeId(String);
 
-impl InterfaceTypeId {
+pub struct RustTypeName(String);
 
-    pub fn new(interface_type_id: String) -> Self {
-        Self(interface_type_id)
+impl RustTypeName {
+
+    pub fn new(rust_type_name: String) -> Self {
+        Self(rust_type_name)
     }
 }
 
-
-impl UrlParam for InterfaceTypeId {
+impl UrlParam for RustTypeName {
     type TargetType = String;
 
     fn name() -> &'static str {
-        "interface_type_id"
+        "rust-type-name"
     }
 
     fn value(&self) -> Self::TargetType {
@@ -102,14 +102,13 @@ impl UrlParam for InterfaceTypeId {
     }
 }
 
-impl FromStr for InterfaceTypeId {
+impl FromStr for RustTypeName {
     type Err = StdError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(Self(s.to_string()))
     }
 }
-
 
 pub struct MethodNames(Vec<String>);
 
@@ -141,5 +140,39 @@ impl FromStr for MethodNames {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(Self(s.split(",").map(|s| s.to_string()).collect()))
+    }
+}
+
+
+pub struct InvokerDirectoryExtension(String);
+
+impl InvokerDirectoryExtension {
+
+    pub fn new(invoker_directory_extension: String) -> Self {
+        Self(invoker_directory_extension)
+    }
+}
+
+impl UrlParam for InvokerDirectoryExtension {
+    type TargetType = String;
+
+    fn name() -> &'static str {
+        "invoker-directory-extension"
+    }
+
+    fn value(&self) -> Self::TargetType {
+        self.0.clone()
+    }
+
+    fn as_str<'a>(&'a self) -> std::borrow::Cow<'a, str> {
+        self.0.as_str().into()
+    }
+}
+
+impl FromStr for InvokerDirectoryExtension {
+    type Err = StdError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(s.to_string()))
     }
 }

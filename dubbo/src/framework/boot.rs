@@ -1,11 +1,11 @@
-use std::{any::TypeId, collections::HashMap};
+use std::collections::HashMap;
 
 use dubbo_base::{url::UrlParam, Url};
 
 use crate::{
     config::{
-        reference_config::{InterfaceTypeId, ReferenceConfig},
-        registry_config::{ReferenceUrl, RegistryConfig},
+        reference_config::{ReferenceConfig, RustTypeName},
+        registry_config::{ReferenceUrl, RegistryConfig, RegistryUrl},
     },
     extension::{
         self, cluster_extension, directory_extension, load_balance_extension,
@@ -169,23 +169,26 @@ impl DubboBoot {
     }
 
     pub async fn reference(&mut self) -> HashMap<String, CloneableInvoker> {
-        let mut map: HashMap<String, CloneableInvoker> = HashMap::new();
+        let mut invoker_cache: HashMap<String, CloneableInvoker> = HashMap::new();
 
         for reference_config in self.reference_configs.iter() {
             let reference_url = reference_config.url().clone();
-            let interface_type_id = reference_url.query::<InterfaceTypeId>().unwrap();
+            let rust_type_name = reference_url.query::<RustTypeName>().unwrap();
 
             let mut invokers = Vec::new();
 
             for registry_configs in self.registry_configs.iter() {
-                let mut registry_url = registry_configs.url().clone();
-                registry_url.add_query_param(ReferenceUrl::new(reference_url.clone()));
+                let registry_url = registry_configs.url().clone();
+
+                let mut extension_url = extension::build_extension_loader_url(registry_url.host().unwrap(), "registry", registry_url.short_url_without_query().as_str());
+                extension_url.add_query_param(RegistryUrl::new(registry_url.clone()));
 
                 let mut protocol_extension =
-                    DubboBoot::load_protocol_extension(registry_url.clone())
+                    DubboBoot::load_protocol_extension(extension_url)
                         .await
                         .unwrap();
-                let invoker = protocol_extension.refer(registry_url).await.unwrap();
+                    
+                let invoker = protocol_extension.refer(reference_url.clone()).await.unwrap();
 
                 invokers.push(invoker);
             }
@@ -200,11 +203,9 @@ impl DubboBoot {
                 invokers = vec![invoker];
             }
 
-            map.insert(interface_type_id.as_str().into(), CloneableInvoker::new(invokers.pop().unwrap()));
+            invoker_cache.insert(rust_type_name.value(), CloneableInvoker::new(invokers.pop().unwrap()));
         }
 
-        map
-
-        
+        invoker_cache
     }
 }

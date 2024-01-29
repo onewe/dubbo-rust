@@ -16,6 +16,8 @@ pub trait Registry {
 
     async fn subscribe(&mut self, url: Url) -> Result<watch::Receiver<HashSet<String>>, StdError>;
 
+    fn url(&self) -> &Url;
+
 }
 
 
@@ -43,15 +45,9 @@ pub(crate) mod proxy {
     #[derive(Clone)]
     pub(crate) struct RegistryProxy {
         sender: tokio::sync::mpsc::Sender<RegistryOpt>,
+        url: Url,
     }
 
-    impl RegistryProxy {
-        pub(crate) fn new(sender: tokio::sync::mpsc::Sender<RegistryOpt>) -> Self {
-            RegistryProxy {
-                sender,
-            }
-        }
-    }
 
     #[async_trait]
     impl Registry for RegistryProxy {
@@ -114,11 +110,17 @@ pub(crate) mod proxy {
                 },
             }
         }
+
+        fn url(&self) -> &Url {
+            &self.url
+        }
     }
 
     impl From<Box<dyn Registry + Send>> for RegistryProxy {
             
             fn from(mut registry: Box<dyn Registry + Send>) -> Self {
+
+                let url = registry.url().clone();
     
                 let (sender, mut receiver) = tokio::sync::mpsc::channel(1024);
     
@@ -147,7 +149,11 @@ pub(crate) mod proxy {
                     }
                 });
     
-                RegistryProxy::new(sender)
+                RegistryProxy {
+                    sender,
+                    url,
+                
+                }
             }
     }
 

@@ -674,6 +674,19 @@ extension_loader_wrapper!(RouterExtensionLoaderWrapper[RouterExtensionLoader<Rou
 extension_loader_wrapper!(InvokerDirectoryExtensionLoaderWrapper[InvokerDirectoryExtensionLoader<InvokerDirectory<=>InvokerDirectoryProxy>]);
 
 
+
+pub fn build_extension_loader_url(host: &str, extension_loader_name: &str, extension_name: &str) -> Url {
+    let mut extension_url = Url::empty();
+
+    extension_url.set_protocol("extensions");
+    extension_url.set_host(host);
+    extension_url.add_query_param(ExtensionLoaderName::new(extension_loader_name));
+    extension_url.add_query_param(ExtensionName::new(extension_name));
+
+    extension_url
+}
+
+
 struct ExtensionLoaderName(String);
 
 impl ExtensionLoaderName {

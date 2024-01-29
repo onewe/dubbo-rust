@@ -15,11 +15,6 @@
  * limitations under the License.
  */
 
-use invoker::Invoker;
-
-use crate::invoker::RpcInvocation;
-
-
 pub mod cluster;
 pub mod directory;
 pub mod filter;
@@ -33,64 +28,3 @@ pub mod config;
 pub mod framework;
 
 pub type StdError = Box<dyn std::error::Error + Send + Sync>;
-
-
-#[async_trait::async_trait]
-pub trait BackendService {
-    
-    async fn say_hello(&mut self, name: String) -> String;
-
-    fn dubbo_service_metadata() 
-    where
-        Self: Sized,
-    {
-
-        let interface_name = "BackendService";
-
-
-
-    }
-
-    fn build_dubbo_service<T>(invoker: T) -> impl BackendService + Clone + Send
-    where
-        Self: Sized + Send,
-        T: Invoker + Clone + Send + 'static
-    {
-        
-        #[derive(Clone)]
-        struct BackendServiceProxy<T> {
-            invoker: T,
-        }
-
-        impl<T> BackendServiceProxy<T> {
-            fn new(invoker: T) -> Self {
-                Self {
-                    invoker,
-                }
-            }
-        }
-
-
-
-        #[async_trait::async_trait]
-        impl<T> BackendService for BackendServiceProxy<T>
-        where
-            T: Invoker + Clone + Send + 'static
-        {
-
-            async fn say_hello(&mut self, name: String) -> String {
-
-                let service_name = "test".to_string();
-                let interface_name = "BackendService".to_string();
-                let method_name = "say_hello".to_string();
-
-               // let rpc_inv = RpcInvocation::new();
-                
-                "".to_string()
-            }
-        }
-
-        BackendServiceProxy::new(invoker)
-    }
-    
-}

@@ -76,3 +76,37 @@ impl FromStr for ReferenceUrl {
         Ok(Self(s.parse()?))
     }
 }
+
+
+pub struct RegistryUrl(Url);
+
+impl RegistryUrl {
+    
+    pub fn new(url: Url) -> Self {
+        Self(url)
+    }
+}
+
+impl UrlParam for RegistryUrl {
+    type TargetType = Url;
+
+    fn name() -> &'static str {
+        "registry"
+    }
+
+    fn value(&self) -> Self::TargetType {
+        self.0.clone()
+    }
+
+    fn as_str<'a>(&'a self) -> std::borrow::Cow<'a, str> {
+        self.0.as_str().into()
+    }
+}
+
+impl FromStr for RegistryUrl {
+    type Err = StdError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(s.parse()?))
+    }
+}
