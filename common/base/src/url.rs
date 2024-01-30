@@ -94,6 +94,14 @@ impl Url {
         pairs.append_pair(T::name(), &param.as_str());
     }
 
+    pub fn remove_query_param<T: UrlParam>(&mut self) {
+        let query = self.inner.query_pairs().filter(|(k, v)|k.ne(T::name()));
+        let mut inner_url = self.inner.clone();
+        inner_url.query_pairs_mut().clear().extend_pairs(query);
+        self.inner = inner_url;
+
+    }
+
     pub fn as_str(&self) -> &str {
         self.inner.as_str()
     }

@@ -16,3 +16,4 @@
  */
 
  pub mod registry_protocol_extension;
+ pub mod registry_protocol_invoker;

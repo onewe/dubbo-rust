@@ -24,7 +24,7 @@ impl ReferenceConfig {
             method_names,
         } = T::service_metadata();
 
-        url.set_protocol("reference");
+        url.set_protocol("consumer");
         url.add_query_param(InterfaceName::new(interface_name));
         url.add_query_param(RustTypeName::new(std::any::type_name::<T>().to_string()));
         url.add_query_param(MethodNames::new(method_names));
@@ -170,6 +170,41 @@ impl UrlParam for InvokerDirectoryExtension {
 }
 
 impl FromStr for InvokerDirectoryExtension {
+    type Err = StdError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(s.to_string()))
+    }
+}
+
+pub struct ClusterExtension(String);
+
+impl ClusterExtension {
+
+    pub fn new(cluster_extension: String) -> Self {
+        Self(cluster_extension)
+    }
+}
+
+
+impl UrlParam for ClusterExtension {
+    type TargetType = String;
+
+    fn name() -> &'static str {
+        "cluster-extension"
+    }
+
+    fn value(&self) -> Self::TargetType {
+        self.0.clone()
+    }
+
+    fn as_str<'a>(&'a self) -> std::borrow::Cow<'a, str> {
+        self.0.as_str().into()
+    }
+}
+
+
+impl FromStr for ClusterExtension {
     type Err = StdError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
