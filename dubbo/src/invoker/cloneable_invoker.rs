@@ -44,7 +44,7 @@ impl CloneableInvoker {
                     receive_message = receiver.recv() => match receive_message {
                         Some((invocation, tx)) => {
                             let ready = {
-                                let mut poll_ready = invoker.poll_ready();
+                                let mut poll_ready = invoker.ready();
                                 poll_fn(|cx| {
                                     match poll_ready.as_mut().poll(cx) {
                                         Poll::Ready(Ok(_)) => {
@@ -142,7 +142,7 @@ impl Clone for CloneableInvoker {
 #[async_trait::async_trait]
 impl Invoker for CloneableInvoker {
 
-    async fn poll_ready(&mut self) -> Result<(), StdError> {
+    async fn ready(&mut self) -> Result<(), StdError> {
        loop {
             if self.gate.is_open() {
                 return Ok(())

@@ -211,3 +211,71 @@ impl FromStr for ClusterExtension {
         Ok(Self(s.to_string()))
     }
 }
+
+
+pub struct RouterExtension(String);
+
+impl RouterExtension {
+
+    pub fn new(router_extension: String) -> Self {
+        Self(router_extension)
+    }
+}
+
+impl UrlParam for RouterExtension {
+    type TargetType = String;
+
+    fn name() -> &'static str {
+        "router-extension"
+    }
+
+    fn value(&self) -> Self::TargetType {
+        self.0.clone()
+    }
+
+    fn as_str<'a>(&'a self) -> std::borrow::Cow<'a, str> {
+        self.0.as_str().into()
+    }
+}
+
+impl FromStr for RouterExtension {
+    type Err = StdError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(s.to_string()))
+    }
+}
+
+
+pub struct LoadBalanceExtension(String);
+
+impl LoadBalanceExtension {
+
+    pub fn new(load_balance_extension: String) -> Self {
+        Self(load_balance_extension)
+    }
+}
+
+impl UrlParam for LoadBalanceExtension {
+    type TargetType = String;
+
+    fn name() -> &'static str {
+        "load-balance-extension"
+    }
+
+    fn value(&self) -> Self::TargetType {
+        self.0.clone()
+    }
+
+    fn as_str<'a>(&'a self) -> std::borrow::Cow<'a, str> {
+        self.0.as_str().into()
+    }
+}
+
+impl FromStr for LoadBalanceExtension {
+    type Err = StdError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(s.to_string()))
+    }
+}

@@ -126,7 +126,7 @@ impl RpcInvocation {
 #[async_trait::async_trait]
 pub trait Invoker {
 
-    async fn poll_ready(&mut self) -> Result<(), StdError>;
+    async fn ready(&mut self) -> Result<(), StdError>;
 
     async fn invoke(&mut self, invocation: RpcInvocation) -> Result<RpcResponse, StdError>;
 

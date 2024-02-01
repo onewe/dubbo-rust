@@ -102,6 +102,10 @@ impl Url {
 
     }
 
+    pub fn remove_all_param(&mut self) {
+        self.inner.query_pairs_mut().clear();
+    }
+
     pub fn as_str(&self) -> &str {
         self.inner.as_str()
     }
