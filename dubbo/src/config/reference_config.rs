@@ -279,3 +279,117 @@ impl FromStr for LoadBalanceExtension {
         Ok(Self(s.to_string()))
     }
 }
+
+
+pub struct Category(String);
+
+impl Category {
+
+    pub fn new(category: String) -> Self {
+        Self(category)
+    }
+}
+
+impl UrlParam for Category {
+    type TargetType = String;
+
+    fn name() -> &'static str {
+        "category"
+    }
+
+    fn value(&self) -> Self::TargetType {
+        self.0.clone()
+    }
+
+    fn as_str<'a>(&'a self) -> std::borrow::Cow<'a, str> {
+        self.0.as_str().into()
+    }
+}
+
+impl FromStr for Category {
+    type Err = StdError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(s.to_string()))
+    }
+}
+
+
+pub struct Version(String);
+
+impl Version {
+
+    pub fn new(version: String) -> Self {
+        Self(version)
+    }
+}
+
+impl UrlParam for Version {
+    type TargetType = String;
+
+    fn name() -> &'static str {
+        "version"
+    }
+
+    fn value(&self) -> Self::TargetType {
+        self.0.clone()
+    }
+
+    fn as_str<'a>(&'a self) -> std::borrow::Cow<'a, str> {
+        self.0.as_str().into()
+    }
+}
+
+impl FromStr for Version {
+    type Err = StdError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(s.to_string()))
+    }
+}
+
+impl Default for Version {
+    fn default() -> Self {
+        Self("".to_string())
+    }
+}
+
+
+pub struct Group(String);
+
+impl Group {
+
+    pub fn new(group: String) -> Self {
+        Self(group)
+    }
+}
+
+impl UrlParam for Group {
+    type TargetType = String;
+
+    fn name() -> &'static str {
+        "group"
+    }
+
+    fn value(&self) -> Self::TargetType {
+        self.0.clone()
+    }
+
+    fn as_str<'a>(&'a self) -> std::borrow::Cow<'a, str> {
+        self.0.as_str().into()
+    }
+}
+
+impl FromStr for Group {
+    type Err = StdError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(s.to_string()))
+    }
+}
+
+impl Default for Group {
+    fn default() -> Self {
+        Self("".to_string())
+    }
+}

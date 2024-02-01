@@ -110,3 +110,84 @@ impl FromStr for RegistryUrl {
         Ok(Self(s.parse()?))
     }
 }
+
+pub struct ServiceNamespace(String);
+
+impl ServiceNamespace {
+    
+    pub fn new(namespace: String) -> Self {
+        Self(namespace)
+    }
+}
+
+impl UrlParam for ServiceNamespace {
+    type TargetType = String;
+
+    fn name() -> &'static str {
+        "namespace"
+    }
+
+    fn value(&self) -> Self::TargetType {
+        self.0.clone()
+    }
+
+    fn as_str<'a>(&'a self) -> std::borrow::Cow<'a, str> {
+        self.0.as_str().into()
+    }
+}
+
+impl FromStr for ServiceNamespace {
+    type Err = StdError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(s.to_string()))
+    }
+}
+
+impl Default for ServiceNamespace {
+    fn default() -> Self {
+        Self("public".to_string())
+    }
+}
+
+
+pub struct AppName(String);
+
+impl AppName {
+    
+    pub fn new(app_name: String) -> Self {
+        Self(app_name)
+    }
+}
+
+
+impl UrlParam for AppName {
+    type TargetType = String;
+
+    fn name() -> &'static str {
+        "app_name"
+    }
+
+    fn value(&self) -> Self::TargetType {
+        self.0.clone()
+    }
+
+    fn as_str<'a>(&'a self) -> std::borrow::Cow<'a, str> {
+        self.0.as_str().into()
+    }
+}
+
+impl FromStr for AppName {
+    type Err = StdError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(s.to_string()))
+    }
+}
+
+
+impl Default for AppName {
+    fn default() -> Self {
+        Self("UnknownApp".to_string())
+    }
+}

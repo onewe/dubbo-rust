@@ -15,4 +15,4 @@
  * limitations under the License.
  */
 
- pub mod dynamic_invoker_directory;
+ pub mod dynamic_invoker_directory_extension;

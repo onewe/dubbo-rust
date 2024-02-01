@@ -19,3 +19,4 @@ once_cell.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 rand.workspace = true
+nacos-sdk = {workspace = true, features = [ "async"]}

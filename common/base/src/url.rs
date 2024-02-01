@@ -60,9 +60,13 @@ impl Url {
         self.inner.query_pairs()
             .find(|(k, _)| k == T::name())
             .map(|(_, v)| T::from_str(&v).ok())
-            .flatten()
-            
-            
+            .flatten()      
+    }
+
+    pub fn all_query_params(&self) -> HashMap<String, String> {
+        self.inner.query_pairs()
+            .map(|(k, v)| (k.into_owned(), v.into_owned()))
+            .collect()
     }
 
     pub fn set_protocol(&mut self, protocol: &str) {
