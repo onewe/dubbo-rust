@@ -51,7 +51,7 @@ impl InvokerDirectoryExtensionLoader for DynamicInvokerDirectoryLoader {
 pub struct DynamicInvokerDirectory {
     reference_url: Url,
     registry: Box<dyn Registry + Send>,
-    subscriber: Option<watch::Receiver<std::collections::HashSet<String>>>,
+    subscriber: Option<watch::Receiver<std::collections::HashSet<Url>>>,
     invoker_cache: HashMap<String, CloneableInvoker>,
 }
 
@@ -71,11 +71,10 @@ impl DynamicInvokerDirectory {
 
 impl DynamicInvokerDirectory {
 
-   async fn to_invokers(urls: HashSet<String>) -> HashMap<String, CloneableInvoker> {
+   async fn to_invokers(urls: HashSet<Url>) -> HashMap<String, CloneableInvoker> {
         let mut invokers = HashMap::new();
         
-        for url in urls {
-            let invoker_url: Url = url.parse().unwrap();
+        for invoker_url in urls {
             // extension://127.0.0.1:9999?extension-loader-name=dubbo&extension-name=dubbo://127.0.0.1
             let extension_url = extension::build_extension_loader_url(invoker_url.host().unwrap(), invoker_url.protocol(), invoker_url.short_url_without_query().as_str());
             

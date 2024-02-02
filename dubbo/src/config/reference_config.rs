@@ -76,6 +76,12 @@ impl FromStr for InterfaceName {
     }
 }
 
+impl Default for InterfaceName {
+    fn default() -> Self {
+        Self("".to_string())
+    }
+}
+
 
 pub struct RustTypeName(String);
 

@@ -2,10 +2,10 @@ use std::{collections::HashSet, sync::Arc};
 
 use async_trait::async_trait;
 use dubbo_base::{url::UrlParam, Url};
-use nacos_sdk::api::{naming::{NamingService, NamingServiceBuilder, ServiceInstance}, props::ClientProps};
-use tokio::sync::watch;
+use nacos_sdk::api::{naming::{NamingEventListener, NamingService, NamingServiceBuilder, ServiceInstance}, props::ClientProps};
+use tokio::sync::{watch, Notify};
 
-use crate::{config::{reference_config::{Category, Group, InterfaceName, Version}, registry_config::{AppName, RegistryUrl, ServiceNamespace}}, extension::{registry_extension::Registry, RegistryExtensionLoader}, StdError};
+use crate::{config::{reference_config::{Category, Group, InterfaceName, Version}, registry_config::{AppName, RegistryUrl, ServiceNamespace, ServiceProtocol}}, extension::{registry_extension::Registry, RegistryExtensionLoader}, StdError};
 
 
 pub struct NacosRegistryLoader;
@@ -126,9 +126,35 @@ impl Registry for NacosRegistry {
         Ok(())
     }
 
-    async fn subscribe(&mut self, url: Url) -> Result<watch::Receiver<HashSet<String>>, StdError> {
+    async fn subscribe(&mut self, url: Url) -> Result<watch::Receiver<HashSet<Url>>, StdError> {
 
-        todo!()
+        let service_name = NacosServiceName::new(&url);
+
+        let group_name = service_name.group().to_owned();
+
+        let registry_service_name_str= service_name.value().to_owned();
+
+
+        let all_instance = self.nacos_service.get_all_instances(registry_service_name_str.to_owned(), Some(group_name.to_owned()), Vec::default(), false).await?;
+
+        let urls: HashSet<_> = all_instance.iter().map(|instance| instance_to_url(instance)).collect();
+
+
+        let (tx, rx) = watch::channel(urls);
+
+        let (event_listener, closed) = NacosNamingEventListener::new(tx);
+
+        let event_listener = Arc::new(event_listener);
+
+        self.nacos_service.subscribe(registry_service_name_str.clone(), Some(group_name.clone()), Vec::default(), event_listener.clone()).await?;
+
+        let clone_nacos_service = self.nacos_service.clone();
+        tokio::spawn(async move {
+            closed.notified().await;
+            let _ = clone_nacos_service.unsubscribe(registry_service_name_str, Some(group_name),  Vec::default(), event_listener).await;
+        });
+
+       Ok(rx)
     }
 
     fn url(&self) -> &Url {
@@ -136,6 +162,60 @@ impl Registry for NacosRegistry {
     }
 
 }
+
+fn instance_to_url(instance: &ServiceInstance) -> Url {
+        
+    let mut url = Url::empty();
+    url.set_protocol("provider");
+    url.set_host(instance.ip());
+    url.set_port(instance.port().try_into().unwrap_or_default());
+    url.extend_pairs(instance.metadata().iter().map(|(k, v)| (k.clone(), v.clone())));
+
+    url
+}
+
+struct NacosNamingEventListener {
+
+    tx: watch::Sender<HashSet<Url>>,
+    closed: Arc<Notify>
+}
+
+impl NacosNamingEventListener {
+
+    fn new(tx: watch::Sender<HashSet<Url>>) -> (Self, Arc<Notify>) {
+
+        let closed = Arc::new(Notify::new());
+
+        let this = Self { tx, closed: closed.clone() };
+        (this, closed)
+    }
+}
+
+
+impl NamingEventListener for NacosNamingEventListener {
+
+    fn event(&self, event: Arc<nacos_sdk::api::naming::NamingChangeEvent>) {
+        
+        match event.instances {
+            Some(ref instances) => {
+               let mut urls = HashSet::new();
+               for instance in instances {
+                     let url = instance_to_url(instance);
+                     urls.insert(url);    
+               }
+               let send = self.tx.send(urls);
+               match send {
+                     Ok(_) => {}
+                     Err(_) => {
+                          self.closed.notify_waiters();
+                     }
+               }
+            },
+            None => {}
+        }
+    }
+}
+
 
 struct NacosServiceName {
 

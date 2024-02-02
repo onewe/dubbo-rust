@@ -14,7 +14,7 @@ pub trait Registry {
 
     async fn unregister(&mut self, url: Url) -> Result<(), StdError>;
 
-    async fn subscribe(&mut self, url: Url) -> Result<watch::Receiver<HashSet<String>>, StdError>;
+    async fn subscribe(&mut self, url: Url) -> Result<watch::Receiver<HashSet<Url>>, StdError>;
 
     fn url(&self) -> &Url;
 
@@ -38,7 +38,7 @@ pub(crate) mod proxy {
     pub(crate) enum RegistryOpt {
         Register(Url, oneshot::Sender<Result<(), StdError>>),
         Unregister(Url, oneshot::Sender<Result<(), StdError>>),
-        Subscribe(Url, oneshot::Sender<Result<watch::Receiver<HashSet<String>>, StdError>>),
+        Subscribe(Url, oneshot::Sender<Result<watch::Receiver<HashSet<Url>>, StdError>>),
         
     }
 
@@ -91,7 +91,7 @@ pub(crate) mod proxy {
             }
         }
 
-        async fn subscribe(&mut self, url: Url) -> Result<watch::Receiver<HashSet<String>>, StdError> {
+        async fn subscribe(&mut self, url: Url) -> Result<watch::Receiver<HashSet<Url>>, StdError> {
             let (tx, rx) = oneshot::channel();
 
             match self.sender.send(RegistryOpt::Subscribe(url.clone(), tx)).await {

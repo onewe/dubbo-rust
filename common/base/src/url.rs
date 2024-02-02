@@ -19,7 +19,7 @@ use std::{
     borrow::Cow, collections::HashMap, fmt::{Display, Formatter, Debug}, str::FromStr
 };
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash,)]
 pub struct Url {
     inner: url::Url,
 }
@@ -91,6 +91,11 @@ impl Url {
 
     pub fn set_path(&mut self, path: &str) {
         let _ = self.inner.set_path(path);
+    }
+
+    pub fn extend_pairs(&mut self, pairs: impl Iterator<Item = (String, String)>) {
+        let mut query_pairs = self.inner.query_pairs_mut();
+        query_pairs.extend_pairs(pairs);
     }
 
     pub fn add_query_param<T: UrlParam>(&mut self, param: T) {
