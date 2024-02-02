@@ -20,3 +20,7 @@ thiserror.workspace = true
 tracing.workspace = true
 rand.workspace = true
 nacos-sdk = {workspace = true, features = [ "async"]}
+serde_json.workspace = true
+serde.workspace = true
+prost.workspace = true
+async-stream.workspace = true

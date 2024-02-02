@@ -26,5 +26,6 @@ pub mod route;
 pub mod extension;
 pub mod config;
 pub mod framework;
+pub mod serialize;
 
 pub type StdError = Box<dyn std::error::Error + Send + Sync>;
