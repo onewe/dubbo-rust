@@ -3,6 +3,7 @@ use std::{marker::PhantomData, pin::Pin};
 use async_stream::stream;
 use bytes::Bytes;
 use futures::Stream;
+use prost::DecodeError;
 
 use crate::StdError;
 
@@ -116,5 +117,54 @@ where
         let buf = self.data.encode_to_vec();
         Ok(Box::new(futures::stream::once(async move { Bytes::from(buf) }))
             as Box<dyn Stream<Item = Bytes> + Send>)
+    }
+}
+
+
+pub struct PostDeserialization<T> {
+    convert: fn(&[u8]) -> Result<T, DecodeError>,
+    _phantom: PhantomData<T>,
+}
+
+
+impl<T> PostDeserialization<T> 
+where
+    T: prost::Message + Default,
+{
+    pub fn new() -> Self {
+        
+        let convert = |data: &[u8]| T::decode(data);
+
+        PostDeserialization {
+            convert,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+
+impl<T> Deserializable<T> for PostDeserialization<T>
+where
+    T: prost::Message + Default,
+    T: 'static,
+{
+    fn deserialize(&self, items: Box<dyn Stream<Item = Bytes> + Send + Unpin>) -> Result<Box<dyn Stream<Item = Result<T, StdError>>>, StdError> {
+        let convert = self.convert;
+        let items = Pin::new(items);
+        let stream = stream! {
+            for await value in items {
+                let value = convert(value.as_ref());
+                let value = match value {
+                    Ok(value) => {
+                        Ok(value)
+                    },
+                    Err(e) => {
+                        Err(StdError::from(e))
+                    }
+                };
+                yield value;
+            }
+        };
+        Ok(Box::new(stream) as Box<dyn Stream<Item = Result<T, StdError>>>)
     }
 }

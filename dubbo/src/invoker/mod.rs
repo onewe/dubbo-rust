@@ -1,25 +1,12 @@
-use std::fmt::Display;
-
 use bytes::Bytes;
 use dubbo_base::Url;
 use futures::Stream;
 use thiserror::Error;
 
-use crate::StdError;
+use crate::{serialize::Serializable, StdError};
 
 pub mod cloneable_invoker;
 
-
-pub trait Serializable: Display {
-
-    fn serialize(&self) -> Result<Box<dyn Stream<Item = Bytes> + Send>, StdError>;
-}
-
-
-pub trait Deserializable {
-    
-    fn deserialize<T>(&self, data: Box<dyn Stream<Item = Bytes> + Send>) -> Result<T, StdError>;
-}
 
 
 
@@ -27,12 +14,12 @@ pub struct Argument {
 
     name: String,
 
-    data: Box<dyn Serializable + Send + 'static>
+    data: Box<dyn Serializable + Send>,
 }
 
 impl Argument {
     
-        pub fn new(name: String, data: Box<dyn Serializable + Send + 'static>) -> Self {
+        pub fn new(name: String, data: Box<dyn Serializable + Send>,) -> Self {
             Self {
                 name,
                 data,
@@ -52,14 +39,26 @@ impl Argument {
 
 pub struct RpcResponse {
     
-    data: Box<dyn Stream<Item = Bytes> + Send>,
+    body: Box<dyn Stream<Item = Bytes> + Send + Unpin>,
+}
+
+impl RpcResponse {
+    
+    pub fn new(body: Box<dyn Stream<Item = Bytes> + Send + Unpin>) -> Self {
+        Self {
+            body,
+        }
+    }
+    
+   pub fn into_body(self) -> Box<dyn Stream<Item = Bytes> + Send + Unpin> {
+        self.body
+    }
+    
 }
 
 
 #[derive(Default)]
 pub struct RpcInvocation {
-
-    service_name: String,
 
     interface_name: String,
 
@@ -72,17 +71,12 @@ pub struct RpcInvocation {
 
 impl RpcInvocation {
     
-    pub fn new(service_name: String, interface_name: String, method_name: String, arguments: Vec<Argument>) -> Self {
+    pub fn new(interface_name: String, method_name: String, arguments: Vec<Argument>) -> Self {
         Self {
-            service_name,
             interface_name,
             method_name,
             arguments,
         }
-    }
-
-    pub fn service_name(&self) -> &str {
-        &self.service_name
     }
 
     pub fn interface_name(&self) -> &str {
@@ -96,10 +90,6 @@ impl RpcInvocation {
 
     pub fn arguments(&self) -> &[Argument] {
         &self.arguments
-    }
-
-    pub fn set_service_name(&mut self, service_name: String) {
-        self.service_name = service_name;
     }
 
     pub fn set_interface_name(&mut self, interface_name: String) {

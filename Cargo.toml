@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
   "common/base",
+  "dubbo-macro",
   "dubbo",
 ]
 
@@ -24,4 +25,5 @@ prost = "0.12"
 async-stream = "0.3"
 dubbo = { path = "./dubbo/" }
 dubbo-base = {path="./common/base"}
+dubbo-macro ={ path = "./dubbo-macro/"}
 

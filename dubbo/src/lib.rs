@@ -15,6 +15,11 @@
  * limitations under the License.
  */
 
+use futures::{FutureExt, TryFutureExt};
+use invoker::{cloneable_invoker::CloneableInvoker, Invoker};
+
+use crate::{invoker::{Argument, RpcInvocation}, serialize::{Deserializable, SerdeJsonDeserialization, SerdeJsonSerialization}};
+
 pub mod cluster;
 pub mod directory;
 pub mod filter;
@@ -29,3 +34,43 @@ pub mod framework;
 pub mod serialize;
 
 pub type StdError = Box<dyn std::error::Error + Send + Sync>;
+
+
+pub trait TestCall {
+    
+    fn say_hello(&self, name: String) -> String;
+}
+
+
+pub struct TestCallImpl {
+    invoker: CloneableInvoker,
+}
+
+
+impl TestCall for TestCallImpl {
+    
+    fn say_hello(&self, name: String) -> String {
+        let interface_name = "test";
+        let method_name = "say_hello";
+
+
+        let name_arg = Argument::new("name".to_string(), Box::new(SerdeJsonSerialization::new(name.clone())));
+
+
+        let invocation = RpcInvocation::new(interface_name.to_string(), method_name.to_string(), vec![name_arg]);
+
+        let mut invoker = self.invoker.clone();
+        
+        tokio::spawn(async move {
+            let _ = invoker.ready().await;
+            let rsp = invoker.invoke(invocation).await.unwrap();
+
+            let body = rsp.into_body();
+            
+            let des: SerdeJsonDeserialization<String> = SerdeJsonDeserialization::<String>::new();
+            let resp = des.deserialize(body);
+        });
+
+        format!("Hello, {}!", name)
+    }
+}
