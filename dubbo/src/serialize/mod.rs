@@ -13,9 +13,11 @@ pub trait Serializable {
 }
 
 
-pub trait Deserializable<T> {
+pub trait Deserializable {
+
+    type Target;
     
-    fn deserialize(&self, data: Box<dyn Stream<Item = Bytes> + Send + Unpin>) -> Result<Box<dyn Stream<Item = Result<T, StdError>>>, StdError>;
+    fn deserialize(&self, data: Box<dyn Stream<Item = Bytes> + Send + Unpin>) -> Result<Box<dyn Stream<Item = Result<Self::Target, StdError>>>, StdError>;
 }
 
 
@@ -65,12 +67,14 @@ where
 }
 
 
-impl<T> Deserializable<T> for SerdeJsonDeserialization<T>
+impl<T> Deserializable for SerdeJsonDeserialization<T>
 where
     T: for<'a> serde::Deserialize<'a>,
     T: 'static,
 {
-    fn deserialize(&self, items: Box<dyn Stream<Item = Bytes> + Send + Unpin>) -> Result<Box<dyn Stream<Item = Result<T, StdError>>>, StdError> {
+    type Target = T;
+
+    fn deserialize(&self, items: Box<dyn Stream<Item = Bytes> + Send + Unpin>) -> Result<Box<dyn Stream<Item = Result<Self::Target, StdError>>>, StdError> {
 
         let convert = self.convert;
         let items = Pin::new(items);
@@ -121,13 +125,13 @@ where
 }
 
 
-pub struct PostDeserialization<T> {
+pub struct ProstDeserialization<T> {
     convert: fn(&[u8]) -> Result<T, DecodeError>,
     _phantom: PhantomData<T>,
 }
 
 
-impl<T> PostDeserialization<T> 
+impl<T> ProstDeserialization<T> 
 where
     T: prost::Message + Default,
 {
@@ -135,7 +139,7 @@ where
         
         let convert = |data: &[u8]| T::decode(data);
 
-        PostDeserialization {
+        ProstDeserialization {
             convert,
             _phantom: PhantomData,
         }
@@ -143,12 +147,15 @@ where
 }
 
 
-impl<T> Deserializable<T> for PostDeserialization<T>
+impl<T> Deserializable for ProstDeserialization<T>
 where
     T: prost::Message + Default,
     T: 'static,
 {
-    fn deserialize(&self, items: Box<dyn Stream<Item = Bytes> + Send + Unpin>) -> Result<Box<dyn Stream<Item = Result<T, StdError>>>, StdError> {
+
+    type Target = T;
+
+    fn deserialize(&self, items: Box<dyn Stream<Item = Bytes> + Send + Unpin>) -> Result<Box<dyn Stream<Item = Result<Self::Target, StdError>>>, StdError> {
         let convert = self.convert;
         let items = Pin::new(items);
         let stream = stream! {

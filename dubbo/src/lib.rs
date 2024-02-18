@@ -53,7 +53,7 @@ impl TestCall for TestCallImpl {
         let interface_name = "test";
         let method_name = "say_hello";
 
-
+        
         let name_arg = Argument::new("name".to_string(), Box::new(SerdeJsonSerialization::new(name.clone())));
 
 
