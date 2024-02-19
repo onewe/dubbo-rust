@@ -3,18 +3,44 @@
 
 #[test]
 fn tests() {
-   
-}
+
+    // mod _check_stream_type {
+    //     use std::marker::PhantomData;
+
+ 
+    //     use futures::Stream;
+
+    //     trait NotImplStream {
+    //         const IMPLS: bool = false;
+    //     }
+
+    //     impl<T: ?Sized> NotImplStream for T {}
+
+    //     struct Wrapper<T: ?Sized>(PhantomData<T>);
+
+    //     impl<T: ?Sized + Stream> Wrapper<T> {
+    //         const IMPLS: bool = true;
+    //     }
 
 
-#[dubbo_macro::reference(interface_name = "RemoteService", ser = "json")]
-pub trait RemoteService {
+    //     pub(in super) fn check_stream_type<T: ?Sized>() -> bool {
+    //         Wrapper::<T>::IMPLS
+    //     }
+    // }
 
-    fn say_hello<T, R, 'a>(&self, name: String, t1: T, r1: &'a R) -> String 
-    where 
-        T: Clone, 
-        R: Clone + 'a;
+    // let s = _check_stream_type::check_stream_type::<String>();
 
-    fn test_async(&self, name: String) -> String;
+    // println!("is stream: {}", s)
     
 }
+
+
+// #[dubbo_macro::reference(interface_name = "RemoteService", ser = "json")]
+// pub trait RemoteService {
+
+
+//     fn test_async(&mut self, name: String) -> Result<String, Box<dyn std::error::Error + Send + Sync>> ;
+    
+// }
+
+

@@ -68,7 +68,9 @@ impl TestCall for TestCallImpl {
             let body = rsp.into_body();
             
             let des: SerdeJsonDeserialization<String> = SerdeJsonDeserialization::<String>::new();
-            let resp = des.deserialize(body);
+            let resp = Deserializable::deserialize(&des, body);
+
+            // let resp = des.deserialize(body);
         });
 
         format!("Hello, {}!", name)

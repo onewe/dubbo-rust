@@ -14,6 +14,10 @@ quote = "1.0"
 syn = {version = "2.0", features = ["default", "extra-traits", "full"]}
 
 
+[dev-dependencies]
+dubbo ={ path = "../dubbo"}
+futures.workspace = true
+
 [[test]]
 name = "tests"
 path = "tests/lib.rs"

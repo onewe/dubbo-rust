@@ -109,6 +109,7 @@ impl ReferenceService {
 
            #(#attrs)*
            #vis struct #ident {
+                invoker: ::dubbo::invoker::cloneable_invoker::CloneableInvoker,
            }
 
            impl #ident {
@@ -139,6 +140,10 @@ impl ReferenceService {
                         ..
                     } = sig;
 
+                    if !ReferenceService::assert_include_mut_self_receiver(inputs) {
+                        continue;
+                    }
+
                     let ReturnType::Type(_, return_ty) = output else {
                         continue;
                     };
@@ -147,6 +152,7 @@ impl ReferenceService {
 
                     let rpc_invocation = ReferenceService::gen_rpc_invocation(fn_ident.to_string(), inputs, interface_name.as_str(), serialization.as_str());
                     
+                    let rpc_response = ReferenceService::gen_grpc_response(serialization.as_str(), return_ty);
 
                     let (_, ty_generics, where_clause) = generics.split_for_impl();
 
@@ -155,6 +161,11 @@ impl ReferenceService {
                         pub async fn #fn_ident #ty_generics(#inputs) #output #where_clause{
                             #assert_return_type
                             #rpc_invocation
+                            
+                            let response = ::dubbo::invoker::Invoker::invoke(&mut self.invoker, invocation).await?;
+                            let body  = ::dubbo::invoker::RpcResponse::into_body(response);
+                          
+                            #rpc_response
                         }
                     };
                     token_stream.extend(function_token_stream);
@@ -164,6 +175,20 @@ impl ReferenceService {
         }
 
         token_stream
+    }
+
+    fn assert_include_mut_self_receiver(input_args: &Punctuated<FnArg, Comma>,) -> bool {
+        for arg in input_args {
+            match arg {
+                FnArg::Receiver(receiver) => {
+                    if receiver.mutability.is_some() {
+                        return true;
+                    }
+                }
+                _ => {}
+            }
+        }
+        false
     }
 
     fn gen_rpc_invocation(method_name: String, input_args: &Punctuated<FnArg, Comma>, interface_name: &str, serialization: &str) -> TokenStream {
@@ -186,9 +211,7 @@ impl ReferenceService {
                         }
                     };
 
-                    let arg_name_str = arg_name.to_string();
-
-                    let tt = ReferenceService::gen_grpc_argument(arg_name_str, arg_name, serialization);
+                    let tt = ReferenceService::gen_grpc_argument(arg_name, serialization);
                     token_stream.extend(tt);
                 }
                 _ => {}
@@ -196,28 +219,154 @@ impl ReferenceService {
         }
         
         token_stream.extend(quote! {
-            let invocation = dubbo::invoker::RpcInvocation::new(interface_name.to_string(), method_name.to_string(), args);
+            let invocation = ::dubbo::invoker::RpcInvocation::new(interface_name.to_string(), method_name.to_string(), args);
         });
         
         token_stream
     }
 
-    fn gen_grpc_argument(arg_name_str:String, arg_name: Ident, serialization: &str) -> TokenStream {
+    fn gen_grpc_argument(arg_name: Ident, serialization: &str) -> TokenStream {
+
+        let arg_name_str = arg_name.to_string();
 
         if serialization == "json" {
             quote! {
-                let #arg_name = dubbo::invoker::Argument::new(#arg_name_str, Box::new(dubbo::serialize::SerdeJsonSerialization::new(#arg_name)));
+                let #arg_name = ::dubbo::invoker::Argument::new(#arg_name_str.to_string(), Box::new(::dubbo::serialize::SerdeJsonSerialization::new(#arg_name)));
                 args.push(#arg_name);
             }
         }
         else if serialization == "prost" {
             quote! {
-                let #arg_name = dubbo::invoker::Argument::new(#arg_name_str, Box::new(dubbo::serialize::ProstSerialization::new(#arg_name)));
+                let #arg_name = ::dubbo::invoker::Argument::new(#arg_name_str.to_string(), Box::new(::dubbo::serialize::ProstSerialization::new(#arg_name)));
                 args.push(#arg_name);
             }
         }
          else {
-            TokenStream::new()
+            quote! {
+                let #arg_name = ::dubbo::invoker::Argument::new(#arg_name_str.to_string(), Box::new(#arg_name));
+                args.push(#arg_name);
+            }
+        }
+    }
+
+    fn gen_grpc_response(serialization: &str, return_ty: &Type) -> TokenStream {
+        if serialization == "json" {
+            quote! {
+
+                macro_rules! extract_ret_type {
+                    (Result<$ret_type:ty,$ret_error_type:ty>) => {
+                        $ret_type
+                    };
+                
+                    (std::result::Result<$ret_type:ty,$ret_error_type:ty>) => {
+                        $ret_type
+                    };
+                }
+
+
+                let des: ::dubbo::serialize::SerdeJsonDeserialization<extract_ret_type![#return_ty]> = ::dubbo::serialize::SerdeJsonDeserialization::<extract_ret_type![#return_ty]>::new();
+                let mut deserialize_data = ::dubbo::serialize::Deserializable::deserialize(&des, body)?;
+
+                mod _check_return_type {
+                    trait IsStreamData { const IS_STREAM: bool = false; }
+
+                    impl<T: ?Sized> IsStreamData for T {}
+
+                    struct Wrapper<T: ?Sized>(::std::marker::PhantomData<T>);
+
+                    impl<T: ?Sized + ::futures::Stream> Wrapper<T> { const IS_STREAM: bool = true; }
+
+                    pub(in super) fn check<T: ?Sized>() -> bool { Wrapper::<T>::IS_STREAM }
+                }
+
+                let is_stream_type = _check_return_type::check::<extract_ret_type![#return_ty]>();
+
+                // if is_stream_type {
+                //     deserialize_data
+                // } else {
+                //     ::futures::pin_mut!(deserialize_data);
+                //     ::futures::StreamExt::next(deserialize_data).await
+                // }
+
+                // ::futures::pin_mut!(deserialize_data);
+                // ::futures::StreamExt::next(deserialize_data).await
+
+               
+            }
+        } else if serialization == "prost" {
+            quote! {
+                macro_rules! extract_ret_type {
+                    (Result<$ret_type:ty,$ret_error_type:ty>) => {
+                        $ret_type
+                    };
+                
+                    (std::result::Result<$ret_type:ty,$ret_error_type:ty>) => {
+                        $ret_type
+                    };
+                }
+
+                let des: ::dubbo::serialize::ProstDeserialization<extract_ret_type![#return_ty]> = ::dubbo::serialize::ProstDeserialization::<extract_ret_type![#return_ty]>::new();
+                let mut deserialize_data = ::dubbo::serialize::Deserializable::deserialize(&des, body);
+
+                mod _check_return_type {
+                    trait IsStreamData { const IS_STREAM: bool = false; }
+
+                    impl<T: ?Sized> IsStreamData for T {}
+
+                    struct Wrapper<T: ?Sized>(::std::marker::PhantomData<T>);
+
+                    impl<T: ?Sized + ::futures::Stream> Wrapper<T> { const IS_STREAM: bool = true; }
+
+                    pub(in super) fn check<T: ?Sized>() -> bool { Wrapper::<T>::IS_STREAM }
+                }
+
+                let is_stream_type = _check_return_type::check::<extract_ret_type![#return_ty]>();
+
+                if is_stream_type {
+                    deserialize_data
+                } else {
+                    ::futures::pin_mut!(deserialize_data);
+                    ::futures::StreamExt::next(deserialize_data).await
+                }
+            }
+        }
+         else {
+            quote! {
+                macro_rules! extract_ret_type {
+                    (Result<$ret_type:ty,$ret_error_type:ty>) => {
+                        $ret_type
+                    };
+                
+                    (std::result::Result<$ret_type:ty,$ret_error_type:ty>) => {
+                        $ret_type
+                    };
+                }
+
+                let des: extract_ret_type![#return_ty] = extract_ret_type![#return_ty]::default();
+  
+                let mut deserialize_data = ::dubbo::serialize::Deserializable::deserialize(&des, body);
+
+                mod _check_return_type {
+                    trait IsStreamData { const IS_STREAM: bool = false; }
+
+                    impl<T: ?Sized> IsStreamData for T {}
+
+                    struct Wrapper<T: ?Sized>(::std::marker::PhantomData<T>);
+
+                    impl<T: ?Sized + ::futures::Stream> Wrapper<T> { const IS_STREAM: bool = true; }
+
+                    pub(in super) fn check<T: ?Sized>() -> bool { Wrapper::<T>::IS_STREAM }
+                }
+
+                let is_stream_type = _check_return_type::check::<extract_ret_type![#return_ty]>();
+
+                if is_stream_type {
+                    deserialize_data
+                } else {
+                    ::futures::pin_mut!(deserialize_data);
+                    ::futures::StreamExt::next(deserialize_data).await
+                }
+            }
         }
     }
 
@@ -226,7 +375,7 @@ impl ReferenceService {
         if serialization == "json" {
             quote! {
                 mod _assert_return_type {
-                    fn expect_return_type<T>(result: Result<T, dubbo::StdError>) where dubbo::serialize::SerdeJsonDeserialization<T>: dubbo::serialize::Deserializable {}
+                    fn expect_return_type<T>(result: Result<T, ::dubbo::StdError>) where ::dubbo::serialize::SerdeJsonDeserialization<T>: ::dubbo::serialize::Deserializable {}
                     fn actual_return_type() -> #rt {
                         unimplemented!()
                     }
@@ -240,7 +389,7 @@ impl ReferenceService {
         } else if serialization == "prost" {
             quote! {
                 mod _assert_return_type {
-                    fn expect_return_type<T>(result: Result<T, dubbo::StdError>) where dubbo::serialize::ProstDeserialization<T>: dubbo::serialize::Deserializable {}
+                    fn expect_return_type<T>(result: Result<T, ::dubbo::StdError>) where ::dubbo::serialize::ProstDeserialization<T>: ::dubbo::serialize::Deserializable {}
                     fn actual_return_type() -> #rt {
                         unimplemented!()
                     }
@@ -253,7 +402,20 @@ impl ReferenceService {
             }
         }
          else {
-            TokenStream::new()
+
+            quote! {
+                mod _assert_return_type {
+                    fn expect_return_type<T>(result: Result<T, ::dubbo::StdError>) where T: ::dubbo::serialize::Deserializable + std::default::Default {}
+                    fn actual_return_type() -> #rt {
+                        unimplemented!()
+                    }
+
+                    fn check_return_type(){
+                        expect_return_type(actual_return_type())
+                    }
+
+                }
+            }
         }
     }
 
