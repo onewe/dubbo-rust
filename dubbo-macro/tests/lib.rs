@@ -35,12 +35,10 @@ fn tests() {
 }
 
 
-// #[dubbo_macro::reference(interface_name = "RemoteService", ser = "json")]
-// pub trait RemoteService {
+#[dubbo_macro::reference(interface_name = "RemoteService", ser = "json")]
+pub trait RemoteService {
 
-
-//     fn test_async(&mut self, name: String) -> Result<String, Box<dyn std::error::Error + Send + Sync>> ;
     
-// }
-
-
+    fn test_async(&mut self, name: String) -> Result<String, Box<dyn std::error::Error + Send + Sync>> ;
+    
+}
