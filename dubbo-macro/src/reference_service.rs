@@ -1,114 +1,14 @@
-use std::{cell::OnceCell, collections::HashMap, sync::{atomic::AtomicUsize, OnceLock}};
 
-use proc_macro2::{Span, TokenStream, TokenTree};
-use quote::{format_ident, quote, TokenStreamExt};
-use syn::{punctuated::Punctuated, token::{Comma, Trait}, FnArg, Generics, Ident, LitStr, ReturnType, Signature, Token, TraitItemFn, Type};
-use syn::Attribute;
-use syn::parse_quote;
-
+use proc_macro2::TokenStream;
+use quote::{format_ident, quote};
+use syn::{punctuated::Punctuated, token::Comma, FnArg, Ident, Signature, TraitItemFn, Type};
+use crate::reference_meta_info::ReferenceMetaInfo;
 
 pub struct ReferenceService {
     attrs: Vec<syn::Attribute>,
     vis: syn::Visibility,
     ident: syn::Ident,
     items: Vec<syn::TraitItem>,
-}
-
-pub struct ReferenceMetaInfo {
-    map: HashMap<String, String>,
-}
-
-impl ReferenceMetaInfo {
-
-    const INTERFACE_NAME: &'static str = "interface";
-
-    const SERIALIZATION: &'static str = "serialization";
-
-    const DEFAULT_SERIALIZATION: &'static str = "json";
-
-    const REFERENCE_TRAIT_NAME: &'static str = "reference_trait_name";
-
-
-    pub fn get_interface_name(&self) -> String {
-        self.map.get(ReferenceMetaInfo::INTERFACE_NAME).and_then(|t|Some(t.clone())).unwrap_or(self.get_reference_trait_name())
-    }
-
-    pub fn get_serialization(&self) -> String {
-        self.map.get(ReferenceMetaInfo::SERIALIZATION).and_then(|t|Some(t.clone())).unwrap_or(ReferenceMetaInfo::DEFAULT_SERIALIZATION.to_owned())
-    }
-
-    pub fn set_reference_trait_name(&mut self, trait_name: String) {
-        self.map.insert(ReferenceMetaInfo::REFERENCE_TRAIT_NAME.to_owned(), trait_name);
-    }
-
-    pub fn get_reference_trait_name(&self) -> String {
-        self.map.get(ReferenceMetaInfo::REFERENCE_TRAIT_NAME).map(|t|t.clone()).unwrap_or_default()
-    }
-
-    pub fn new(attrs: Vec<MetaNameValue>) -> Self {
-        let mut map = HashMap::new();
-
-        for attr in attrs {
-            let key = attr.path.get_ident();
-            match key {
-                Some(key) => match attr.value {
-                    syn::Expr::Lit(lit) => match lit.lit {
-                        syn::Lit::Str(str_lit) => {
-                            let value = str_lit.value();
-                            let key = key.to_string();
-                            map.insert(key, value);
-                        }
-                        _ => {
-                            continue;
-                        }
-                    },
-                    _ => {
-                        continue;
-                    }
-                },
-                None => {
-                    continue;
-                }
-            }
-        }
-
-        ReferenceMetaInfo { map }
-    }
-}
-
-impl syn::parse::Parse for ReferenceMetaInfo {
-    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let attrs =
-            syn::punctuated::Punctuated::<syn::MetaNameValue, Token![,]>::parse_terminated(input)?;
-        Ok(ReferenceMetaInfo::new(attrs))
-    }
-}
-
-
-impl ReferenceMetaInfo {
-
-    fn to_token_stream(&self) -> TokenStream {
-        let mut token_stream = TokenStream::new();
-
-        let mut kv_token_streams = Vec::new();
-
-        for (key, value) in &self.map {
-            let key = key.as_str();
-            let value = value.as_str();
-            let kv_token_stream = quote! {
-                #key = #value
-            };
-            
-            kv_token_streams.push(kv_token_stream);
-        }
-
-        token_stream.extend(quote! {
-            #[::dubbo_macro::reference_meta_info(#(#kv_token_streams),*)]
-        });
-
-        token_stream
-
-    }
 }
 
 
@@ -138,7 +38,7 @@ impl syn::parse::Parse for ReferenceService {
 }
 
 impl ReferenceService {
-    pub fn to_token_stream(self, mut reference_attr: ReferenceMetaInfo) -> syn::Result<TokenStream> {
+    pub fn to_token_stream(self, reference_attr: ReferenceMetaInfo) -> syn::Result<TokenStream> {
         let ReferenceService {
             attrs,
             vis,
@@ -146,27 +46,26 @@ impl ReferenceService {
             items,
         } = self;
 
-        let reference_trait_name = ident.to_string();
-        reference_attr.set_reference_trait_name(reference_trait_name);
+        let trait_name = ident.to_string();
 
-        let functions_token_stream = ReferenceService::gen_proxy_method(&items, &reference_attr);
+        let functions_token_stream = ReferenceService::gen_proxy_method(&items, &reference_attr, trait_name);
 
         let token_stream = quote::quote! {
-
            #(#attrs)*
            #vis struct #ident {
                 invoker: ::dubbo::invoker::cloneable_invoker::CloneableInvoker,
            }
-
+        
            impl #ident {
                #functions_token_stream
            }
         };
 
+        reference_attr.put_to_global();
         Ok(token_stream)
     }
 
-    fn gen_proxy_method(items: &Vec<syn::TraitItem>, reference_meta_info: &ReferenceMetaInfo) -> TokenStream {
+    fn gen_proxy_method(items: &Vec<syn::TraitItem>, reference_meta_info: &ReferenceMetaInfo, trait_name: String) -> TokenStream {
         let mut token_stream = TokenStream::new();
 
         for item in items {
@@ -183,11 +82,14 @@ impl ReferenceService {
                         ..
                     } = sig;
 
-                    if !ReferenceService::assert_include_mut_self_receiver(inputs) {
-                        continue;
-                    }
-
-
+                    // if !ReferenceService::assert_include_mut_self_receiver(&inputs) {
+                    //     continue;
+                    // }
+                    
+                    let reference_meta_info_idx = reference_meta_info.idx();
+                    
+                    let proxy_fn_name = format_ident!("{}_proxy_by_{}_{}", fn_ident.to_string(), trait_name, reference_meta_info_idx);
+                    
                     // let ReturnType::Type(_, return_ty) = output else {
                     //     continue;
                     // };
@@ -199,15 +101,10 @@ impl ReferenceService {
                     // let rpc_response = ReferenceService::gen_grpc_response(serialization.as_str(), return_ty);
 
                     let (_, ty_generics, where_clause) = generics.split_for_impl();
-
-
-                    let reference_meta_info_token_stream = reference_meta_info.to_token_stream();
-
                     let function_token_stream = quote! {
                         #(#attrs)*
-                        #reference_meta_info_token_stream
-                        pub fn #fn_ident #ty_generics(#inputs) #output #where_clause{
-
+                        pub async fn #proxy_fn_name #ty_generics(#inputs) #output #where_clause{
+                    
                             todo!()
                         }
                     };
@@ -219,6 +116,7 @@ impl ReferenceService {
 
         token_stream
     }
+
 
     fn assert_include_mut_self_receiver(input_args: &Punctuated<FnArg, Comma>,) -> bool {
         for arg in input_args {
