@@ -34,6 +34,12 @@ fn tests() {
     
 }
 
+mod assert_cs_in_arg_type {
+
+    fn check_cs_in_type_json<T>() where T: futures::Stream, dubbo::serialize::SerdeJsonSerialization<<T as futures::Stream>::Item>: dubbo::serialize::Serializable, {}
+    
+    fn check_cs_in_type_prost<T>() where T: futures::Stream, dubbo::serialize::ProstSerialization<<T as futures::Stream>::Item>: dubbo::serialize::Serializable, {}
+}
 
 
 #[dubbo_macro::reference]

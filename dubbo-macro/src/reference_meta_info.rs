@@ -44,6 +44,11 @@ impl ReferenceMetaInfo {
         let meta_infos = meta_infos.lock().expect("can not get reference meta info lock");
         meta_infos.get(idx).map(|x| x.clone())
     }
+    
+    pub fn get_from_global_by_reference_name(reference_name: &str) -> Option<Self> {
+        let vec: Vec<_> = reference_name.split("_").collect();
+        vec.last().map(|idx|idx.parse::<usize>().ok()).flatten().and_then(|idx|ReferenceMetaInfo::get_from_global(idx))
+    }
     pub fn put_to_global(self) {
         let meta_infos = REFERENCE_META_INFO.get_or_init(|| {
             let  v = Vec::new();
