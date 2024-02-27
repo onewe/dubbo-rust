@@ -42,6 +42,28 @@ mod assert_cs_in_arg_type {
 }
 
 
+mod assert_return_type {
+    use std::error::Error;
+    use futures::Stream;
+
+    fn actual_return_type() -> Result<String, String> {
+        unimplemented!()
+    }
+
+    fn return_type_checker<T, E>(actual_return_type: Result<T, E>)
+    where
+        T: Stream,
+        T
+        E: From<Box<dyn Error + Send + Sync>>
+    {
+
+    }
+
+    fn test_fn() {
+        return_type_checker(actual_return_type());
+    }
+}
+
 #[dubbo_macro::reference]
 pub trait RemoteService {
 
