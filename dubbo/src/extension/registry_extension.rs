@@ -49,6 +49,8 @@ pub fn to_extension_url(registry_url: Url) -> Url {
 pub type ServiceChange = Change<String, ()>;
 pub type DiscoverStream = Receiver<Result<ServiceChange, StdError>>;
 
+// url: registry://127.0.0.1:8848?protocol=nacos
+// extension_url: extension://0.0.0.0?extension-type=registry&extension-name=nacos&registry-url=registry://127.0.0.1:8848?protocol=nacos
 #[async_trait]
 pub trait Registry {
     async fn register(&self, url: Url) -> Result<(), StdError>;

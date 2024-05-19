@@ -15,8 +15,12 @@
  * limitations under the License.
  */
 
-mod invoker_extension;
+pub mod invoker_extension;
 pub mod registry_extension;
+pub mod cluster_extension;
+pub mod loadbalancer_extension;
+pub mod invoker_directory_extension;
+pub mod route_extension;
 
 use crate::{
     extension::{

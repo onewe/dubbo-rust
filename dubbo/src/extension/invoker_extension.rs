@@ -30,6 +30,9 @@ use futures_core::Stream;
 use std::{collections::HashMap, future::Future, marker::PhantomData, pin::Pin};
 use thiserror::Error;
 
+
+// url: invoker://127.0.0.1:8080?protocol=trip
+// extension_url: extension://0.0.0.0?extension-type=invoker&extension-name=trip-invoker&invoker-url=invoker://127.0.0.1:8080?protocol=trip
 #[async_trait]
 pub trait Invoker {
     async fn invoke(

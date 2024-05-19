@@ -25,6 +25,7 @@ use crate::{
 use self::failover::Failover;
 
 mod failover;
+mod n_cluster;
 
 pub struct NewCluster<N> {
     inner: N, // new loadbalancer service
