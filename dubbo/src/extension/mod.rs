@@ -21,11 +21,11 @@ pub mod cluster_extension;
 pub mod loadbalancer_extension;
 pub mod invoker_directory_extension;
 pub mod route_extension;
+mod protocol_extension;
 
 use crate::{
     extension::{
-        invoker_extension::proxy::InvokerProxy,
-        registry_extension::{proxy::RegistryProxy, RegistryExtension},
+        registry_extension::RegistryExtension,
     },
     logger::tracing::{error, info},
     params::extension_param::ExtensionType,
@@ -34,8 +34,12 @@ use crate::{
     StdError, Url,
 };
 use std::{future::Future, pin::Pin, sync::Arc};
+use async_trait::async_trait;
 use thiserror::Error;
 use tokio::sync::{oneshot, RwLock};
+use crate::extension::cluster_extension::Cluster;
+use crate::extension::invoker_extension::Invoker;
+use crate::extension::registry_extension::Registry;
 
 pub static EXTENSIONS: once_cell::sync::Lazy<ExtensionDirectoryCommander> =
     once_cell::sync::Lazy::new(|| ExtensionDirectory::init());
@@ -367,7 +371,7 @@ impl ExtensionDirectoryCommander {
         }
     }
 
-    pub async fn load_registry(&self, url: Url) -> Result<RegistryProxy, StdError> {
+    pub async fn load_registry(&self, url: Url) -> Result<Box<dyn Registry + Send + 'static>, StdError> {
         let url_str = url.to_string();
         info!("load registry extension: {}", url_str);
 
@@ -403,7 +407,7 @@ impl ExtensionDirectoryCommander {
         }
     }
 
-    pub async fn load_invoker(&self, url: Url) -> Result<InvokerProxy, StdError> {
+    pub async fn load_invoker(&self, url: Url) -> Result<Box<dyn Invoker + Send + 'static>, StdError> {
         let url_str = url.to_string();
         info!("load invoker extension: {}", url_str);
 
@@ -473,8 +477,8 @@ pub(crate) trait ExtensionMetaInfo {
 }
 
 pub(crate) enum Extensions {
-    Registry(RegistryProxy),
-    Invoker(InvokerProxy),
+    Registry(Box<dyn Registry + Send + 'static>),
+    Invoker(Box<dyn Invoker + Send + 'static>),
 }
 
 pub(crate) enum ExtensionFactories {

@@ -23,3 +23,4 @@ pub mod provider;
 pub mod registry;
 pub mod router;
 pub mod service;
+pub mod dubbo_config;

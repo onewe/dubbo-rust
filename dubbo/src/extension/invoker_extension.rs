@@ -17,7 +17,7 @@
 
 use crate::{
     extension::{
-        invoker_extension::proxy::InvokerProxy, Extension, ExtensionFactories, ExtensionMetaInfo,
+        Extension, ExtensionFactories, ExtensionMetaInfo,
         LoadExtensionPromise,
     },
     params::extension_param::{ExtensionName, ExtensionType},
@@ -28,6 +28,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures_core::Stream;
 use std::{collections::HashMap, future::Future, marker::PhantomData, pin::Pin};
+use std::any::Any;
 use thiserror::Error;
 
 
@@ -36,11 +37,15 @@ use thiserror::Error;
 #[async_trait]
 pub trait Invoker {
     async fn invoke(
-        &self,
+        &mut self,
         invocation: GrpcInvocation,
     ) -> Result<Pin<Box<dyn Stream<Item = Bytes> + Send + 'static>>, StdError>;
 
-    async fn url(&self) -> Result<Url, StdError>;
+    async fn ready(&mut self) -> Result<(), StdError>;
+
+    fn url(&self) -> Result<Url, StdError>;
+
+    fn clone(&self) -> Box<dyn Invoker + Send + 'static>;
 }
 
 pub enum CallType {
@@ -65,6 +70,8 @@ pub struct Argument {
 
 pub trait Serializable {
     fn serialize(&self, serialization_type: String) -> Result<Bytes, StdError>;
+
+    fn into_any(self) -> Box<dyn Any + Send + 'static>;
 }
 
 pub trait Deserializable {
@@ -73,117 +80,6 @@ pub trait Deserializable {
         Self: Sized;
 }
 
-pub mod proxy {
-    use crate::{
-        extension::invoker_extension::{GrpcInvocation, Invoker},
-        StdError, Url,
-    };
-    use async_trait::async_trait;
-    use bytes::Bytes;
-    use futures_core::Stream;
-    use std::pin::Pin;
-    use thiserror::Error;
-    use tokio::sync::{mpsc::Sender, oneshot};
-    use tracing::error;
-
-    pub(super) enum InvokerOpt {
-        Invoke(
-            GrpcInvocation,
-            oneshot::Sender<Result<Pin<Box<dyn Stream<Item = Bytes> + Send + 'static>>, StdError>>,
-        ),
-        Url(oneshot::Sender<Result<Url, StdError>>),
-    }
-
-    #[derive(Clone)]
-    pub struct InvokerProxy {
-        tx: Sender<InvokerOpt>,
-    }
-
-    #[async_trait]
-    impl Invoker for InvokerProxy {
-        async fn invoke(
-            &self,
-            invocation: GrpcInvocation,
-        ) -> Result<Pin<Box<dyn Stream<Item = Bytes> + Send + 'static>>, StdError> {
-            let (tx, rx) = oneshot::channel();
-            let ret = self.tx.send(InvokerOpt::Invoke(invocation, tx)).await;
-            match ret {
-                Ok(_) => {}
-                Err(err) => {
-                    error!(
-                        "call invoke method failed by invoker proxy, error: {:?}",
-                        err
-                    );
-                    return Err(InvokerProxyError::new(
-                        "call invoke method failed by invoker proxy",
-                    )
-                    .into());
-                }
-            }
-            let ret = rx.await?;
-            ret
-        }
-
-        async fn url(&self) -> Result<Url, StdError> {
-            let (tx, rx) = oneshot::channel();
-            let ret = self.tx.send(InvokerOpt::Url(tx)).await;
-            match ret {
-                Ok(_) => {}
-                Err(err) => {
-                    error!("call url method failed by invoker proxy, error: {:?}", err);
-                    return Err(
-                        InvokerProxyError::new("call url method failed by invoker proxy").into(),
-                    );
-                }
-            }
-            let ret = rx.await?;
-            ret
-        }
-    }
-
-    impl From<Box<dyn Invoker + Send + 'static>> for InvokerProxy {
-        fn from(invoker: Box<dyn Invoker + Send + 'static>) -> Self {
-            let (tx, mut rx) = tokio::sync::mpsc::channel(64);
-            tokio::spawn(async move {
-                while let Some(opt) = rx.recv().await {
-                    match opt {
-                        InvokerOpt::Invoke(invocation, tx) => {
-                            let result = invoker.invoke(invocation).await;
-                            let callback_ret = tx.send(result);
-                            match callback_ret {
-                                Ok(_) => {}
-                                Err(Err(err)) => {
-                                    error!("invoke method has been called, but callback to caller failed. {:?}", err);
-                                }
-                                _ => {}
-                            }
-                        }
-                        InvokerOpt::Url(tx) => {
-                            let ret = tx.send(invoker.url().await);
-                            match ret {
-                                Ok(_) => {}
-                                Err(err) => {
-                                    error!("url method has been called, but callback to caller failed. {:?}", err);
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-            InvokerProxy { tx }
-        }
-    }
-
-    #[derive(Error, Debug)]
-    #[error("invoker proxy error: {0}")]
-    pub struct InvokerProxyError(String);
-
-    impl InvokerProxyError {
-        pub fn new(msg: &str) -> Self {
-            InvokerProxyError(msg.to_string())
-        }
-    }
-}
 
 #[derive(Default)]
 pub(super) struct InvokerExtensionLoader {
@@ -199,7 +95,7 @@ impl InvokerExtensionLoader {
         self.factories.remove(&extension_name);
     }
 
-    pub fn load(&mut self, url: Url) -> Result<LoadExtensionPromise<InvokerProxy>, StdError> {
+    pub fn load(&mut self, url: Url) -> Result<LoadExtensionPromise<Box<dyn Invoker + Send + 'static>>, StdError> {
         let extension_name = url.query::<ExtensionName>();
         let Some(extension_name) = extension_name else {
             return Err(InvokerExtensionLoaderError::new(
@@ -227,7 +123,7 @@ type InvokerExtensionConstructor = fn(
 >;
 pub(crate) struct InvokerExtensionFactory {
     constructor: InvokerExtensionConstructor,
-    instances: HashMap<String, LoadExtensionPromise<InvokerProxy>>,
+    instances: HashMap<String, LoadExtensionPromise<Box<dyn Invoker + Send + 'static>>>,
 }
 
 impl InvokerExtensionFactory {
@@ -240,7 +136,7 @@ impl InvokerExtensionFactory {
 }
 
 impl InvokerExtensionFactory {
-    pub fn create(&mut self, url: Url) -> Result<LoadExtensionPromise<InvokerProxy>, StdError> {
+    pub fn create(&mut self, url: Url) -> Result<LoadExtensionPromise<Box<dyn Invoker + Send + 'static>>, StdError> {
         let key = url.to_string();
 
         match self.instances.get(&key) {
@@ -248,21 +144,20 @@ impl InvokerExtensionFactory {
             None => {
                 let constructor = self.constructor;
                 let creator = move |url: Url| {
-                    let invoker_future = constructor(url);
                     Box::pin(async move {
-                        let invoker = invoker_future.await?;
-                        Ok(InvokerProxy::from(invoker))
+                        let invoker = constructor(url).await?;
+                        Ok(invoker)
                     })
                         as Pin<
                             Box<
-                                dyn Future<Output = Result<InvokerProxy, StdError>>
+                                dyn Future<Output = Result<Box<dyn Invoker + Send + 'static>, StdError>>
                                     + Send
                                     + 'static,
                             >,
                         >
                 };
 
-                let promise: LoadExtensionPromise<InvokerProxy> =
+                let promise: LoadExtensionPromise<Box<dyn Invoker + Send + 'static>> =
                     LoadExtensionPromise::new(Box::new(creator), url);
                 self.instances.insert(key, promise.clone());
                 Ok(promise)

@@ -14,6 +14,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+mod n_load_balancer;
+
 use crate::StdError;
 use futures_core::future::BoxFuture;
 use tower::{discover::ServiceList, ServiceExt};
