@@ -21,6 +21,7 @@ use async_trait::async_trait;
 use thiserror::Error;
 use tokio::sync::mpsc::Receiver;
 use tower::discover::Change;
+use url::form_urlencoded::Target;
 
 use crate::{
     params::{extension_param::ExtensionName, registry_param::RegistryUrl},
@@ -85,9 +86,42 @@ where
     }
 
     fn extension_factory() -> ExtensionFactories {
-        ExtensionFactories::RegistryExtensionFactory(RegistryExtensionFactory::new(
-            <T as Extension>::create,
-        ))
+
+        // let c = T::create;
+
+        // fn create(url: Url) -> Pin<Box<dyn Future<Output = Result<Box<dyn Registry + Send + Sync + 'static>, StdError>> + Send>> {
+        //     Box::pin(async move {
+        //         (c)(url).await
+        //     })
+        // }
+
+        // let a = create;
+
+        // let b = a as RegistryConstructor;
+      
+        // ExtensionFactories::RegistryExtensionFactory(RegistryExtensionFactory::new(
+        //     b,
+        // ))
+
+        // let create = |url: Url|{
+        //     Box::pin(async move {
+        //         T::create(url).await
+        //     })
+        // } as RegistryConstructor;
+
+        // let f: RegistryConstructor = Extension::create;
+
+        fn create<F>(f: F) -> F 
+        where
+            F: Fn(Url) -> Pin<Box<dyn Future<Output = Result<Box<dyn Registry + Send>, Box<dyn std::error::Error + Send + Sync>>> + Send>>
+        {
+            f
+        }
+
+        let c = create(<T as Extension>::create);
+
+
+        todo!()
     }
 }
 

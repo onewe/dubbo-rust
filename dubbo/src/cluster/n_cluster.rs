@@ -11,26 +11,30 @@ use crate::{StdError, Url};
 use crate::params::cluster_params::ClusterType;
 use crate::params::registry_param::InterfaceName;
 use crate::url::UrlParam;
+use anyhow::anyhow;
 
-pub struct MkClusterBuilder<N> {
-    inner: N
+pub struct MkClusterBuilder<N, M> {
+    inner: N,
+    _marker: std::marker::PhantomData<M>
 }
 
 
-impl<N> MkClusterBuilder<N> {
+impl<N, M> MkClusterBuilder<N, M> {
     pub fn layer() -> impl tower_layer::Layer<N, Service = Self> {
         tower_layer::layer_fn(|inner: N| {
             MkClusterBuilder {
-                inner
+                inner,
+                _marker: std::marker::PhantomData
             }
         })
     }
 }
 
-impl<N, M> Service<DubboConfig> for MkClusterBuilder<N>
+impl<N, M> Service<DubboConfig> for MkClusterBuilder<N, M>
 where
-    N: MakeService<DubboConfig, M>,
-    M: MakeService<Url, Box<dyn LoadBalancer + Send + 'static>>
+    N: MakeService<DubboConfig, Url, Service = M, MakeError = StdError>,
+    <N as MakeService<DubboConfig, Url>>::Future: Future<Output = Result<N::Service, N::MakeError>> + Send + 'static,
+    M: Service<Url, Response = Box<dyn LoadBalancer + Send>, Error = StdError>
 {
     type Response = ClusterBuilder<M>;
     type Error = StdError;
@@ -59,7 +63,7 @@ where
 pub struct ClusterBuilder<N> {
     default_cluster_type: String,
     inner: N,
-    cache: HashMap<String, Box<dyn Cluster + Send + 'static>>
+    cache: HashMap<String, Box<dyn Cluster + Send>>
 }
 
 
@@ -76,9 +80,9 @@ impl<N>  ClusterBuilder<N> {
 
 impl<N> Service<Url> for ClusterBuilder<N>
 where
-    N: MakeService<Url, Box<dyn LoadBalancer + Send + 'static>>
+    N: Service<Url, Response = Box<dyn LoadBalancer + Send>, Error = StdError>
 {
-    type Response = Box<dyn Cluster + Send + 'static>;
+    type Response = Box<dyn Cluster + Send>;
     type Error = StdError;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
 
@@ -90,7 +94,7 @@ where
         let cluster_type = req.query::<ClusterType>();
         let interface_name = req.query::<InterfaceName>();
         let Some(interface_name) = interface_name else {
-          return Box::pin(async { Err(StdError::new("interface name is required")) } )
+          return Box::pin(async { Err(anyhow!("interface name is required").into()) } )
         };
         let interface_name = interface_name.value();
         let cached_cluster = self.cache.get(&interface_name).map(|cluster| {
@@ -103,8 +107,14 @@ where
         match cached_cluster {
             Some(fut) => fut,
             None => {
-                let fut = self.inner.make_service(req);
-                let default_cluster_type = self.default_cluster_type.clone();
+                let fut = self.inner.call(req);
+
+                let cluster_type = if let Some(cluster_type) = cluster_type {
+                    cluster_type.value()
+                } else {
+                    self.default_cluster_type.clone()
+                };
+
                 let fut = async move {
                     let load_balancer = fut.await?;
                     let cluster = Cluster::new(default_cluster_type, load_balancer);

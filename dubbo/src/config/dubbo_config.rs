@@ -6,7 +6,7 @@ pub struct DubboConfig;
 
 impl DubboConfig {
 
-    pub fn cluster() -> String {
-        todo!()
+    pub fn cluster(&self) -> String {
+        "test".to_string()
     }
 }
