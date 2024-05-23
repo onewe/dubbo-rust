@@ -24,9 +24,7 @@ pub mod route_extension;
 mod protocol_extension;
 
 use crate::{
-    extension::{
-        registry_extension::RegistryExtension,
-    },
+    extension::registry_extension::RegistryExtension,
     logger::tracing::{error, info},
     params::extension_param::ExtensionType,
     registry::registry::StaticRegistry,
@@ -34,10 +32,8 @@ use crate::{
     StdError, Url,
 };
 use std::{future::Future, pin::Pin, sync::Arc};
-use async_trait::async_trait;
 use thiserror::Error;
 use tokio::sync::{oneshot, RwLock};
-use crate::extension::cluster_extension::Cluster;
 use crate::extension::invoker_extension::Invoker;
 use crate::extension::registry_extension::Registry;
 
@@ -244,7 +240,7 @@ pub(crate) struct LoadExtensionPromise<T> {
 
 impl<T> LoadExtensionPromise<T>
 where
-    T: Send + Clone + 'static,
+    T: Send + Sync + Clone + 'static,
 {
     pub(crate) fn new(creator: ExtensionCreator<T>, url: Url) -> Self {
         let resolver = ExtensionPromiseResolver::new(creator, url);

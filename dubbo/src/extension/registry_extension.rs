@@ -65,7 +65,14 @@ pub trait Registry {
 
     fn url(&self) -> &Url;
 
-    fn clone(&self) -> Box<dyn Registry + Send + 'static>;
+    fn clone(&self) -> Box<dyn Registry + Send + Sync + 'static>;
+}
+
+
+impl Clone for Box<dyn Registry + Send + Sync + 'static> {
+    fn clone(&self) -> Self {
+        Registry::clone(self.as_ref())
+    }
 }
 
 pub struct RegistryExtension<T>(PhantomData<T>)
@@ -75,7 +82,7 @@ where
 impl<T> ExtensionMetaInfo for RegistryExtension<T>
 where
     T: Registry + Send + 'static,
-    T: Extension<Target = Box<dyn Registry + Send + 'static>>,
+    T: Extension<Target = Box<dyn Registry + Send + Sync + 'static>>,
 {
     fn name() -> String {
         T::name()
@@ -86,42 +93,9 @@ where
     }
 
     fn extension_factory() -> ExtensionFactories {
-
-        // let c = T::create;
-
-        // fn create(url: Url) -> Pin<Box<dyn Future<Output = Result<Box<dyn Registry + Send + Sync + 'static>, StdError>> + Send>> {
-        //     Box::pin(async move {
-        //         (c)(url).await
-        //     })
-        // }
-
-        // let a = create;
-
-        // let b = a as RegistryConstructor;
-      
-        // ExtensionFactories::RegistryExtensionFactory(RegistryExtensionFactory::new(
-        //     b,
-        // ))
-
-        // let create = |url: Url|{
-        //     Box::pin(async move {
-        //         T::create(url).await
-        //     })
-        // } as RegistryConstructor;
-
-        // let f: RegistryConstructor = Extension::create;
-
-        fn create<F>(f: F) -> F 
-        where
-            F: Fn(Url) -> Pin<Box<dyn Future<Output = Result<Box<dyn Registry + Send>, Box<dyn std::error::Error + Send + Sync>>> + Send>>
-        {
-            f
-        }
-
-        let c = create(<T as Extension>::create);
-
-
-        todo!()
+        ExtensionFactories::RegistryExtensionFactory(RegistryExtensionFactory::new(
+            <T as Extension>::create
+        ))
     }
 }
 
@@ -142,7 +116,7 @@ impl RegistryExtensionLoader {
     pub(crate) fn load(
         &mut self,
         url: Url,
-    ) -> Result<LoadExtensionPromise<Box<dyn Registry + Send + 'static>>, StdError> {
+    ) -> Result<LoadExtensionPromise<Box<dyn Registry + Send + Sync + 'static>>, StdError> {
         let extension_name = url.query::<ExtensionName>().unwrap();
         let extension_name = extension_name.value();
         let factory = self.factories.get_mut(&extension_name).ok_or_else(|| {
@@ -163,7 +137,7 @@ type RegistryConstructor = fn(
 
 pub(crate) struct RegistryExtensionFactory {
     constructor: RegistryConstructor,
-    instances: HashMap<String, LoadExtensionPromise<Box<dyn Registry + Send + 'static>>>,
+    instances: HashMap<String, LoadExtensionPromise<Box<dyn Registry + Send + Sync + 'static>>>,
 }
 
 impl RegistryExtensionFactory {
@@ -179,7 +153,7 @@ impl RegistryExtensionFactory {
     pub(super) fn create(
         &mut self,
         url: Url,
-    ) -> Result<LoadExtensionPromise<Box<dyn Registry + Send + 'static>>, StdError> {
+    ) -> Result<LoadExtensionPromise<Box<dyn Registry + Send + Sync + 'static>>, StdError> {
         let registry_url = url.query::<RegistryUrl>().unwrap();
         let registry_url = registry_url.value();
         let url_str = registry_url.as_str().to_string();
@@ -198,7 +172,7 @@ impl RegistryExtensionFactory {
                     })
                         as Pin<
                             Box<
-                                dyn Future<Output = Result<Box<dyn Registry + Send + 'static>, StdError>>
+                                dyn Future<Output = Result<Box<dyn Registry + Send + Sync + 'static>, StdError>>
                                     + Send
                                     + 'static,
                             >,

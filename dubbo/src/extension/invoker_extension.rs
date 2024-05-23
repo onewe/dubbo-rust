@@ -45,7 +45,13 @@ pub trait Invoker {
 
     fn url(&self) -> Result<Url, StdError>;
 
-    fn clone(&self) -> Box<dyn Invoker + Send + 'static>;
+    fn clone(&self) -> Box<dyn Invoker + Send + Sync + 'static>;
+}
+
+impl Clone for Box<dyn Invoker + Send + Sync + 'static> {
+    fn clone(&self) -> Box<dyn Invoker + Send + Sync + 'static> {
+        Invoker::clone(self.as_ref())
+    }
 }
 
 pub enum CallType {
@@ -95,7 +101,7 @@ impl InvokerExtensionLoader {
         self.factories.remove(&extension_name);
     }
 
-    pub fn load(&mut self, url: Url) -> Result<LoadExtensionPromise<Box<dyn Invoker + Send + 'static>>, StdError> {
+    pub fn load(&mut self, url: Url) -> Result<LoadExtensionPromise<Box<dyn Invoker + Send + Sync + 'static>>, StdError> {
         let extension_name = url.query::<ExtensionName>();
         let Some(extension_name) = extension_name else {
             return Err(InvokerExtensionLoaderError::new(
@@ -119,11 +125,11 @@ impl InvokerExtensionLoader {
 type InvokerExtensionConstructor = fn(
     Url,
 ) -> Pin<
-    Box<dyn Future<Output = Result<Box<dyn Invoker + Send + 'static>, StdError>> + Send + 'static>,
+    Box<dyn Future<Output = Result<Box<dyn Invoker + Send + Sync + 'static>, StdError>> + Send + 'static>,
 >;
 pub(crate) struct InvokerExtensionFactory {
     constructor: InvokerExtensionConstructor,
-    instances: HashMap<String, LoadExtensionPromise<Box<dyn Invoker + Send + 'static>>>,
+    instances: HashMap<String, LoadExtensionPromise<Box<dyn Invoker + Send + Sync + 'static>>>,
 }
 
 impl InvokerExtensionFactory {
@@ -136,7 +142,7 @@ impl InvokerExtensionFactory {
 }
 
 impl InvokerExtensionFactory {
-    pub fn create(&mut self, url: Url) -> Result<LoadExtensionPromise<Box<dyn Invoker + Send + 'static>>, StdError> {
+    pub fn create(&mut self, url: Url) -> Result<LoadExtensionPromise<Box<dyn Invoker + Send + Sync + 'static>>, StdError> {
         let key = url.to_string();
 
         match self.instances.get(&key) {
@@ -150,15 +156,14 @@ impl InvokerExtensionFactory {
                     })
                         as Pin<
                             Box<
-                                dyn Future<Output = Result<Box<dyn Invoker + Send + 'static>, StdError>>
+                                dyn Future<Output = Result<Box<dyn Invoker + Send + Sync + 'static>, StdError>>
                                     + Send
                                     + 'static,
                             >,
                         >
                 };
 
-                let promise: LoadExtensionPromise<Box<dyn Invoker + Send + 'static>> =
-                    LoadExtensionPromise::new(Box::new(creator), url);
+                let promise = LoadExtensionPromise::new(Box::new(creator), url);
                 self.instances.insert(key, promise.clone());
                 Ok(promise)
             }
@@ -173,7 +178,7 @@ where
 impl<T> ExtensionMetaInfo for InvokerExtension<T>
 where
     T: Invoker + Send + 'static,
-    T: Extension<Target = Box<dyn Invoker + Send + 'static>>,
+    T: Extension<Target = Box<dyn Invoker + Send + Sync + 'static>>,
 {
     fn name() -> String {
         T::name()
