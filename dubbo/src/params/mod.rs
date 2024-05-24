@@ -22,3 +22,4 @@ pub mod constants;
 pub mod extension_param;
 pub mod registry_param;
 pub mod cluster_params;
+pub mod invoke_param;

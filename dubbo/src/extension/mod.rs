@@ -26,12 +26,13 @@ mod protocol_extension;
 use crate::{
     extension::registry_extension::RegistryExtension,
     logger::tracing::{error, info},
-    params::extension_param::ExtensionType,
+    params::extension_param::{ExtensionName, ExtensionType},
     registry::registry::StaticRegistry,
     url::UrlParam,
     StdError, Url,
 };
 use std::{future::Future, pin::Pin, sync::Arc};
+use cluster_extension::Cluster;
 use thiserror::Error;
 use tokio::sync::{oneshot, RwLock};
 use crate::extension::invoker_extension::Invoker;
@@ -44,6 +45,7 @@ pub static EXTENSIONS: once_cell::sync::Lazy<ExtensionDirectoryCommander> =
 struct ExtensionDirectory {
     registry_extension_loader: registry_extension::RegistryExtensionLoader,
     invoker_extension_loader: invoker_extension::InvokerExtensionLoader,
+    cluster_extension_loader: cluster_extension::ClusterExtensionLoader,
 }
 
 impl ExtensionDirectory {
@@ -112,6 +114,14 @@ impl ExtensionDirectory {
                 }
                 _ => Ok(()),
             },
+            ExtensionType::Cluster => match extension_factories {
+                ExtensionFactories::ClusterExtensionFactory(cluster_extension_factory) => {
+                    self.cluster_extension_loader
+                        .register(extension_name, cluster_extension_factory);
+                    Ok(())
+                }
+                _ => Ok(()),
+            }
         }
     }
 
@@ -127,6 +137,10 @@ impl ExtensionDirectory {
             }
             ExtensionType::Invoker => {
                 self.invoker_extension_loader.remove(extension_name);
+                Ok(())
+            },
+            ExtensionType::Cluster => {
+                self.cluster_extension_loader.remove(&extension_name);
                 Ok(())
             }
         }
@@ -184,6 +198,30 @@ impl ExtensionDirectory {
                         let _ = callback.send(Err(err));
                     }
                 }
+            },
+            ExtensionType::Cluster => {
+                let extension = self.cluster_extension_loader.load(url);
+                match extension {
+                    Ok(mut extension) => {
+                        tokio::spawn(async move {
+                            let cluster = extension.resolve().await;
+                            match cluster {
+                                Ok(cluster) => {
+                                    let _ = callback.send(Ok(Extensions::Cluster(cluster)));
+                                }
+                                Err(err) => {
+                                    error!("load cluster extension failed: {}", err);
+                                    let _ = callback.send(Err(err));
+                                }
+                            }
+                        });
+                    }
+                    Err(err) => {
+                        error!("load cluster extension failed: {}", err);
+                        let _ = callback.send(Err(err));
+                    }
+                }
+            
             }
         }
     }
@@ -367,7 +405,7 @@ impl ExtensionDirectoryCommander {
         }
     }
 
-    pub async fn load_registry(&self, url: Url) -> Result<Box<dyn Registry + Send + 'static>, StdError> {
+    pub async fn load_registry(&self, url: Url) -> Result<Box<dyn Registry + Send + Sync + 'static>, StdError> {
         let url_str = url.to_string();
         info!("load registry extension: {}", url_str);
 
@@ -403,7 +441,7 @@ impl ExtensionDirectoryCommander {
         }
     }
 
-    pub async fn load_invoker(&self, url: Url) -> Result<Box<dyn Invoker + Send + 'static>, StdError> {
+    pub async fn load_invoker(&self, url: Url) -> Result<Box<dyn Invoker + Send + Sync + 'static>, StdError> {
         let url_str = url.to_string();
         info!("load invoker extension: {}", url_str);
 
@@ -437,6 +475,45 @@ impl ExtensionDirectoryCommander {
                 panic!("load invoker extension failed: invalid extension type");
             }
         }
+    }
+
+
+    pub async fn load_cluster(&self, url: Url) -> Result<Box<dyn Cluster + Send + Sync + 'static>, StdError> {
+
+        let url_str = url.to_string();
+        info!("load cluster extension: {}", url_str);
+
+        let (tx, rx) = oneshot::channel();
+
+        let send = self
+            .sender
+            .send(ExtensionOpt::Load(url, ExtensionType::Cluster, tx))
+            .await;
+
+        let Ok(_) = send else {
+            let err_msg = format!("load cluster extension failed: {}", url_str);
+            return Err(LoadExtensionError::new(err_msg).into());
+        };
+
+        let extensions = rx.await;
+
+        let Ok(extension) = extensions else {
+            let err_msg = format!("load cluster extension failed: {}", url_str);
+            return Err(LoadExtensionError::new(err_msg).into());
+        };
+
+        let Ok(extensions) = extension else {
+            let err_msg = format!("load cluster extension failed: {}", url_str);
+            return Err(LoadExtensionError::new(err_msg).into());
+        };
+
+        match extensions {
+            Extensions::Cluster(proxy) => Ok(proxy),
+            _ => {
+                panic!("load cluster extension failed: invalid extension type");
+            }
+        }
+
     }
 }
 
@@ -473,13 +550,26 @@ pub(crate) trait ExtensionMetaInfo {
 }
 
 pub(crate) enum Extensions {
-    Registry(Box<dyn Registry + Send + 'static>),
-    Invoker(Box<dyn Invoker + Send + 'static>),
+    Registry(Box<dyn Registry + Send + Sync + 'static>),
+    Invoker(Box<dyn Invoker + Send + Sync + 'static>),
+    Cluster(Box<dyn Cluster + Send + Sync + 'static>)
 }
 
 pub(crate) enum ExtensionFactories {
     RegistryExtensionFactory(registry_extension::RegistryExtensionFactory),
     InvokerExtensionFactory(invoker_extension::InvokerExtensionFactory),
+    ClusterExtensionFactory(cluster_extension::ClusterExtensionFactory),
+}
+
+
+pub fn build_extension_url(extension_type: ExtensionType, extension_name: ExtensionName) -> Url {
+
+    let mut url = Url::empty();
+    url.set_protocol("extension");
+    url.set_host("0.0.0.0");
+    url.add_query_param(extension_type);
+    url.add_query_param(extension_name);
+    url
 }
 
 #[derive(Error, Debug)]

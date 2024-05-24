@@ -14,14 +14,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-use crate::{url::UrlParam, StdError};
+use crate::{url::UrlParam, StdError, Url};
 use std::{borrow::Cow, convert::Infallible, str::FromStr};
 
 pub struct ExtensionName(String);
 
 impl ExtensionName {
-    pub fn new(name: String) -> Self {
-        ExtensionName(name)
+    pub fn new(name: impl Into<String>) -> Self {
+        ExtensionName(name.into())
     }
 }
 
@@ -52,6 +52,7 @@ impl FromStr for ExtensionName {
 pub enum ExtensionType {
     Registry,
     Invoker,
+    Cluster
 }
 
 impl UrlParam for ExtensionType {
@@ -65,13 +66,15 @@ impl UrlParam for ExtensionType {
         match self {
             ExtensionType::Registry => "registry".to_owned(),
             ExtensionType::Invoker => "invoker".to_owned(),
+            ExtensionType::Cluster => "cluster".to_owned(),
         }
     }
 
     fn as_str(&self) -> Cow<str> {
         match self {
-            ExtensionType::Registry => Cow::Borrowed("registry"),
-            ExtensionType::Invoker => Cow::Borrowed("invoker"),
+            ExtensionType::Registry => "registry".into(),
+            ExtensionType::Invoker => "invoker".into(),
+            ExtensionType::Cluster => "cluster".into(),
         }
     }
 }
@@ -84,5 +87,44 @@ impl FromStr for ExtensionType {
             "registry" => Ok(ExtensionType::Registry),
             _ => panic!("the extension type enum is not in range"),
         }
+    }
+}
+
+
+
+#[derive(Debug, Clone)]
+pub struct ExtensionUrl(Url);
+
+impl ExtensionUrl {
+    pub fn new(url: Url) -> Self {
+        ExtensionUrl(url)
+    }
+}
+
+
+impl UrlParam for ExtensionUrl {
+    
+    type TargetType = Url;
+
+    fn name() -> &'static str {
+        "extension-url"
+    }
+
+    fn value(&self) -> Self::TargetType {
+        self.0.clone()
+    }
+
+    fn as_str(&self) -> Cow<str> {
+        self.0.as_str().into()
+    }
+}
+
+
+impl FromStr for ExtensionUrl {
+    
+    type Err = StdError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(ExtensionUrl::new(s.parse()?))
     }
 }
