@@ -14,157 +14,106 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-mod n_route;
-
+use std::future::Future;
 use std::pin::Pin;
-
-use crate::{logger::tracing::debug, StdError};
-use futures_core::{ready, Future};
-use futures_util::{future::Ready, FutureExt, TryFutureExt};
-use tower::{buffer::Buffer, util::FutureService};
+use std::task::{Context, Poll};
+use thiserror::Error;
 use tower_service::Service;
-
-use crate::{
-    codegen::{RpcInvocation, TripleInvoker},
-    invoker::clone_invoker::CloneInvoker,
-    param::Param,
-    svc::NewService,
-};
-
-pub struct NewRoutes<N> {
-    inner: N,
-}
-
-pub struct NewRoutesFuture<S, T> {
-    inner: RoutesFutureInnerState<S>,
-    #[allow(dead_code)]
-    target: T,
-}
-
-pub enum RoutesFutureInnerState<S> {
-    Service(S),
-    Future(
-        Pin<
-            Box<
-                dyn Future<Output = Result<Vec<CloneInvoker<TripleInvoker>>, StdError>>
-                    + Send
-                    + 'static,
-            >,
-        >,
-    ),
-    Ready(Vec<CloneInvoker<TripleInvoker>>),
-}
+use crate::config::dubbo_config::DubboConfig;
+use crate::extension::route_extension::Router;
+use crate::params::extension_params::{ExtensionName, ExtensionType, ExtensionUrl};
+use crate::params::invoke_params::InvokeServiceName;
+use crate::params::router_params::{RouterName, RouterServiceName, RouterType};
+use crate::url::UrlParam;
+use crate::{extension, StdError, Url};
 
 #[derive(Clone)]
-pub struct Routes<T> {
-    #[allow(dead_code)]
-    target: T,
-    invokers: Vec<CloneInvoker<TripleInvoker>>,
-}
+pub struct MkRouterBuilder;
 
-impl<N> NewRoutes<N> {
-    pub fn new(inner: N) -> Self {
-        Self { inner }
-    }
-}
 
-impl<N> NewRoutes<N> {
-    const MAX_ROUTE_BUFFER_SIZE: usize = 16;
 
-    pub fn layer() -> impl tower_layer::Layer<N, Service = Self> {
-        tower_layer::layer_fn(|inner: N| NewRoutes::new(inner))
-    }
-}
-
-impl<N, T> NewService<T> for NewRoutes<N>
-where
-    T: Param<RpcInvocation> + Clone + Send + Unpin + 'static,
-    // NewDirectory
-    N: NewService<T>,
-    // Directory
-    N::Service: Service<(), Response = Vec<CloneInvoker<TripleInvoker>>> + Unpin + Send + 'static,
-    <N::Service as Service<()>>::Error: Into<StdError>,
-    <N::Service as Service<()>>::Future: Send + 'static,
-{
-    type Service =
-        Buffer<FutureService<NewRoutesFuture<<N as NewService<T>>::Service, T>, Routes<T>>, ()>;
-
-    fn new_service(&self, target: T) -> Self::Service {
-        let inner = self.inner.new_service(target.clone());
-
-        Buffer::new(
-            FutureService::new(NewRoutesFuture {
-                inner: RoutesFutureInnerState::Service(inner),
-                target,
-            }),
-            Self::MAX_ROUTE_BUFFER_SIZE,
-        )
-    }
-}
-
-impl<N, T> Future for NewRoutesFuture<N, T>
-where
-    T: Param<RpcInvocation> + Clone + Unpin,
-    // Directory
-    N: Service<(), Response = Vec<CloneInvoker<TripleInvoker>>> + Unpin,
-    N::Error: Into<StdError>,
-    N::Future: Send + 'static,
-{
-    type Output = Result<Routes<T>, StdError>;
-
-    fn poll(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Self::Output> {
-        let this = self.get_mut();
-
-        loop {
-            match this.inner {
-                RoutesFutureInnerState::Service(ref mut service) => {
-                    debug!("RoutesFutureInnerState::Service");
-                    let _ = ready!(service.poll_ready(cx)).map_err(Into::into)?;
-                    let fut = service.call(()).map_err(|e| e.into()).boxed();
-                    this.inner = RoutesFutureInnerState::Future(fut);
-                }
-                RoutesFutureInnerState::Future(ref mut futures) => {
-                    debug!("RoutesFutureInnerState::Future");
-                    let invokers = ready!(futures.as_mut().poll(cx))?;
-                    this.inner = RoutesFutureInnerState::Ready(invokers);
-                }
-                RoutesFutureInnerState::Ready(ref invokers) => {
-                    debug!("RoutesFutureInnerState::Ready");
-                    let target = this.target.clone();
-                    return std::task::Poll::Ready(Ok(Routes {
-                        invokers: invokers.clone(),
-                        target,
-                    }));
-                }
-            }
-        }
-    }
-}
-
-impl<T> Service<()> for Routes<T>
-where
-    T: Param<RpcInvocation> + Clone,
-{
-    type Response = Vec<CloneInvoker<TripleInvoker>>;
+impl Service<DubboConfig> for MkRouterBuilder {
+    
+    type Response = RouterBuilder;
 
     type Error = StdError;
 
-    type Future = Ready<Result<Self::Response, Self::Error>>;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send + 'static>>;
 
-    fn poll_ready(
-        &mut self,
-        _: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), Self::Error>> {
-        std::task::Poll::Ready(Ok(()))
+    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, _: ()) -> Self::Future {
-        // some router operator
-        // if new_invokers changed, send new invokers to routes_rx after router operator
-        futures_util::future::ok(self.invokers.clone())
+    fn call(&mut self, req: DubboConfig) -> Self::Future {
+        let fut = async move {
+            let router_type = req.router();
+            Ok(RouterBuilder {
+                router_type
+            })
+        };
+        Box::pin(fut)
     }
+}
+
+
+#[derive(Clone)]
+pub struct RouterBuilder {
+    router_type: RouterType,
+}
+
+
+impl Service<Url> for RouterBuilder {
+
+    type Response = Box<dyn Router + Send + Sync + 'static>;
+
+    type Error = StdError;
+
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send + 'static>>;
+
+    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, req: Url) -> Self::Future {
+        let invoke_service_name = req.query::<InvokeServiceName>();
+        let Some(invoke_service_name) = invoke_service_name else {
+            return Box::pin(async move {
+                return Err(RouterBuildError::new("service name mustn't be empty").into());
+            });
+        };
+
+        let invoke_service_name = invoke_service_name.value();
+
+        // build router url
+        let router_name = RouterName::new(format!("{}-{}", invoke_service_name, self.router_type.as_str()));
+        let router_service_name = RouterServiceName::new(invoke_service_name.as_str());
+        let mut router_url = extension::route_extension::build_router_url(invoke_service_name.as_str());
+        router_url.add_query_param(router_name);
+        router_url.add_query_param(router_service_name);
+
+        // build extension url
+        let extension_name = ExtensionName::new(self.router_type.as_str());
+        let extension_url = ExtensionUrl::new(router_url);
+        let mut router_extension_url = extension::build_extension_url(ExtensionType::Router, extension_name);
+        router_extension_url.add_query_param(extension_url);
+
+        let fut = async move {
+            let router = extension::EXTENSIONS.load_router(req).await?;
+            Ok(router)
+        };
+        Box::pin(fut)
+    }
+}
+
+
+
+#[derive(Debug, Error)]
+#[error("Router build error: {0}")]
+pub struct RouterBuildError(String);
+
+impl RouterBuildError {
+    pub fn new(msg: impl Into<String>) -> Self {
+        RouterBuildError(msg.into())
+    }
+
 }

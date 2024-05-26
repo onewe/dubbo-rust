@@ -17,23 +17,21 @@
 
 use std::sync::Arc;
 
-use crate::{
-    cluster::NewCluster, directory::NewCachedDirectory, extension, loadbalancer::NewLoadBalancer,
-    route::NewRoutes, utils::boxed_clone::BoxCloneService,
-};
+use crate::cluster::MkClusterBuilder;
+use crate::config::dubbo_config::DubboConfig;
+use crate::directory::MkInvokerDirectoryBuilder;
+use crate::loadbalancer::MkLoadBalancerBuilder;
+use crate::registry::MkRegistryBuilder;
+use crate::route::MkRouterBuilder;
+use crate::{extension, utils::boxed_clone::BoxCloneService,};
 
-use crate::{
-    registry::{registry::StaticRegistry, MkRegistryService},
-    Url,
-};
+use crate::{cluster, directory, loadbalancer, registry, route, Dubbo, Url};
 use aws_smithy_http::body::SdkBody;
-use tower::ServiceBuilder;
+use tower::{Layer, MakeService, Service, ServiceBuilder};
 
 pub type ClientBoxService =
     BoxCloneService<http::Request<SdkBody>, http::Response<crate::BoxBody>, crate::Error>;
 
-pub type ServiceMK =
-    Arc<NewCluster<NewLoadBalancer<NewRoutes<NewCachedDirectory<MkRegistryService>>>>>;
 
 #[derive(Default)]
 pub struct ClientBuilder {
@@ -54,13 +52,15 @@ impl ClientBuilder {
     }
 
     pub fn from_static(host: &str) -> ClientBuilder {
-        let registry_extension_url = StaticRegistry::to_extension_url(vec![host.parse().unwrap()]);
-        Self {
-            timeout: None,
-            connector: "",
-            registry_extension_url: Some(registry_extension_url),
-            direct: true,
-        }
+        // let registry_extension_url = StaticRegistry::to_extension_url(vec![host.parse().unwrap()]);
+        // Self {
+        //     timeout: None,
+        //     connector: "",
+        //     registry_extension_url: Some(registry_extension_url),
+        //     direct: true,
+        // }
+
+        todo!()
     }
 
     pub fn with_timeout(self, timeout: u64) -> Self {
@@ -71,20 +71,11 @@ impl ClientBuilder {
     }
 
     pub fn with_registry(self, registry: Url) -> Self {
-        let registry_extension_url = extension::registry_extension::to_extension_url(registry);
-        Self {
-            registry_extension_url: Some(registry_extension_url),
-            ..self
-        }
+        todo!()
     }
 
     pub fn with_host(self, host: &'static str) -> Self {
-        let registry_extension_url = StaticRegistry::to_extension_url(vec![host.parse().unwrap()]);
-
-        Self {
-            registry_extension_url: Some(registry_extension_url),
-            ..self
-        }
+        todo!()
     }
 
     pub fn with_connector(self, connector: &'static str) -> Self {
@@ -95,19 +86,37 @@ impl ClientBuilder {
         Self { direct, ..self }
     }
 
-    pub fn build(mut self) -> ServiceMK {
+    pub async  fn build(mut self) {
         let registry = self
             .registry_extension_url
             .take()
             .expect("registry must not be empty");
 
-        let mk_service = ServiceBuilder::new()
-            .layer(NewCluster::layer())
-            .layer(NewLoadBalancer::layer())
-            .layer(NewRoutes::layer())
-            .layer(NewCachedDirectory::layer())
-            .service(MkRegistryService::new(registry));
+        let mut builder = ServiceBuilder::new()
+            .layer(cluster::MkClusterBuilder::layer())
+            .layer(loadbalancer::MkLoadBalancerBuilder::layer(route::MkRouterBuilder))
+            .layer(directory::MkInvokerDirectoryBuilder::layer())
+            .service(registry::MkRegistryBuilder);
 
-        Arc::new(mk_service)
+
+            // let mut r = route::MkRouterBuilder;
+            // let b = r.make_service(DubboConfig).await.unwrap();
+            // let c = b.call("".parse().unwrap()).await.unwrap();
+
+        let dubbo_config = DubboConfig;
+
+        let s = builder.make_service(dubbo_config).await.unwrap();
+
+
+        // let mk_service = builder.make_service(dubbo_config);
+
+        // let mk_service = ServiceBuilder::new()
+        //     .layer(NewCluster::layer())
+        //     .layer(NewLoadBalancer::layer())
+        //     .layer(NewRoutes::layer())
+        //     .layer(NewCachedDirectory::layer())
+        //     .service(MkRegistryService::new(registry));
+
+        // Arc::new(mk_service)
     }
 }

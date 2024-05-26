@@ -24,10 +24,8 @@ pub mod route_extension;
 pub mod protocol_extension;
 
 use crate::{
-    extension::registry_extension::RegistryExtension,
     logger::tracing::{error, info},
     params::extension_params::{ExtensionName, ExtensionType},
-    registry::registry::StaticRegistry,
     url::UrlParam,
     StdError, Url,
 };
@@ -59,12 +57,6 @@ impl ExtensionDirectory {
         tokio::spawn(async move {
             let mut extension_directory = ExtensionDirectory::default();
 
-            // register static registry extension
-            let _ = extension_directory.register(
-                StaticRegistry::name(),
-                RegistryExtension::<StaticRegistry>::extension_factory(),
-                RegistryExtension::<StaticRegistry>::extension_type(),
-            );
 
             while let Some(extension_opt) = rx.recv().await {
                 match extension_opt {

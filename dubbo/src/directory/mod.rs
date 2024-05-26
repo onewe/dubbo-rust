@@ -14,266 +14,164 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+use std::pin::Pin;
 
-use std::{
-    collections::HashMap,
-    pin::Pin,
-    sync::{Arc, Mutex},
-    task::{Context, Poll},
-};
+use futures::Future;
+use thiserror::Error;
+use tower::{Layer, MakeService, Service};
 
-use crate::{
-    codegen::{RpcInvocation, TripleInvoker},
-    invocation::Invocation,
-    invoker::{clone_invoker::CloneInvoker, NewInvoker},
-    logger::tracing::{debug, error},
-    param::Param,
-    svc::NewService,
-    StdError, Url,
-};
-use futures_util::future;
-use tokio::sync::mpsc::channel;
-use tokio_stream::wrappers::ReceiverStream;
-use tower::{
-    buffer::Buffer,
-    discover::{Change, Discover},
-    ServiceExt,
-};
+use crate::{config::dubbo_config::DubboConfig, extension::{self, invoker_directory_extension::InvokerList, protocol_extension::Invoker, registry_extension::Registry}, params::{extension_params::{ExtensionName, ExtensionType, ExtensionUrl}, invoke_params::InvokeServiceName, invoker_direcotry_params::{InvokerDirectoryName, InvokerDirectoryServiceName, InvokerDirectoryType}, invoker_params::InvokerProtocol, protocol_params::ProtocolType}, url::UrlParam, StdError, Url};
 
-use crate::{
-    extension::registry_extension::{proxy::RegistryProxy, Registry},
-    params::registry_params::InterfaceName,
-};
-use tower_service::Service;
-
-pub mod n_invoker_directory;
-
-type BufferedDirectory =
-    Buffer<Directory<ReceiverStream<Result<Change<String, ()>, StdError>>>, ()>;
-
-pub struct NewCachedDirectory<N>
-where
-    N: Service<(), Response = RegistryProxy> + Send + Clone + 'static,
-    <N as Service<()>>::Future: Send + 'static,
-{
-    inner: CachedDirectory<NewDirectory<N>, RpcInvocation>,
-}
-
-pub struct CachedDirectory<N, T>
-where
-    // NewDirectory
-    N: NewService<T>,
-{
-    inner: N,
-    cache: Arc<Mutex<HashMap<String, N::Service>>>,
-}
-
-pub struct NewDirectory<N> {
-    // registry
+pub struct MkInvokerDirectoryBuilder<N> {
     inner: N,
 }
 
-pub struct Directory<D> {
-    directory: HashMap<String, CloneInvoker<TripleInvoker>>,
-    discover: D,
-    new_invoker: NewInvoker,
+
+impl<N> MkInvokerDirectoryBuilder<N> {
+
+    pub fn layer() -> impl Layer<N, Service = Self> {
+        tower_layer::layer_fn(|inner| MkInvokerDirectoryBuilder { inner })
+    }
 }
 
-impl<N> NewCachedDirectory<N>
+
+impl<N> Service<DubboConfig> for MkInvokerDirectoryBuilder<N> 
 where
-    N: Service<(), Response = RegistryProxy> + Send + Clone + 'static,
-    <N as Service<()>>::Future: Send + 'static,
+    N: MakeService<DubboConfig, Url, MakeError = StdError>,
+    N::Future: Send + 'static,
+    N::Service: Service<Url, Response = Box<dyn Registry + Send + Sync + 'static>, Error = StdError> + Send + 'static,
+    <N::Service as Service<Url>>::Future: Send + 'static,
 {
-    pub fn layer() -> impl tower_layer::Layer<N, Service = Self> {
-        tower_layer::layer_fn(|inner: N| {
-            NewCachedDirectory {
-                // inner is registry
-                inner: CachedDirectory::new(NewDirectory::new(inner)),
-            }
-        })
+    
+    type Response = InvokerDirectoryBuilder<N::Service>;
+    type Error = StdError;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send + 'static>>;
+    
+    fn poll_ready(&mut self, cx: &mut std::task::Context<'_>) -> std::task::Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx)
     }
+    
+    fn call(&mut self, req: DubboConfig) -> Self::Future {
+        let invoker_directory_type = req.invoker_directory();
+        let registry_builder = self.inner.make_service(req);
+        let fut = async move {
+            let registry_builder = registry_builder.await?;
+            Ok(InvokerDirectoryBuilder {
+                inner: registry_builder,
+                invoker_directory_type,
+            })
+        };
+        Box::pin(fut)
+    }
+
 }
 
-impl<N, T> NewService<T> for NewCachedDirectory<N>
+pub struct InvokerDirectoryBuilder<N> {
+    inner: N,
+    invoker_directory_type: InvokerDirectoryType,
+}
+
+
+impl<N> Service<Url> for InvokerDirectoryBuilder<N> 
 where
-    T: Param<RpcInvocation>,
-    // service registry
-    N: Service<(), Response = RegistryProxy> + Send + Clone + 'static,
-    <N as Service<()>>::Future: Send + 'static,
+    N: Service<Url, Response = Box<dyn Registry + Send + Sync + 'static>, Error = StdError>,
+    N::Future: Future<Output = Result<N::Response, N::Error>> + Send + 'static
 {
-    type Service = BufferedDirectory;
-
-    fn new_service(&self, target: T) -> Self::Service {
-        self.inner.new_service(target.param())
-    }
-}
-
-impl<N, T> CachedDirectory<N, T>
-where
-    N: NewService<T>,
-{
-    pub fn new(inner: N) -> Self {
-        CachedDirectory {
-            inner,
-            cache: Default::default(),
-        }
-    }
-}
-
-impl<N, T> NewService<T> for CachedDirectory<N, T>
-where
-    T: Param<RpcInvocation>,
-    // NewDirectory
-    N: NewService<T>,
-    // Buffered directory
-    N::Service: Clone,
-{
-    type Service = N::Service;
-
-    fn new_service(&self, target: T) -> Self::Service {
-        let rpc_invocation = target.param();
-        let service_name = rpc_invocation.get_target_service_unique_name();
-        let mut cache = self.cache.lock().expect("cached directory lock failed.");
-        let value = cache.get(&service_name).map(|val| val.clone());
-        match value {
-            None => {
-                let new_service = self.inner.new_service(target);
-                cache.insert(service_name, new_service.clone());
-                new_service
-            }
-            Some(value) => value,
-        }
-    }
-}
-
-impl<N> NewDirectory<N> {
-    const MAX_DIRECTORY_BUFFER_SIZE: usize = 16;
-
-    pub fn new(inner: N) -> Self {
-        NewDirectory { inner }
-    }
-}
-
-impl<N, T> NewService<T> for NewDirectory<N>
-where
-    T: Param<RpcInvocation>,
-    // service registry
-    N: Service<(), Response = RegistryProxy> + Send + Clone + 'static,
-    <N as Service<()>>::Future: Send + 'static,
-{
-    type Service = BufferedDirectory;
-
-    fn new_service(&self, target: T) -> Self::Service {
-        let service_name = target.param().get_target_service_unique_name();
-
-        let fut = self.inner.clone().oneshot(());
-
-        let (tx, rx) = channel(Self::MAX_DIRECTORY_BUFFER_SIZE);
-
-        tokio::spawn(async move {
-            // todo use dubbo url model generate subscribe url
-            // category:serviceInterface:version:group
-            let consumer_url = format!("consumer://{}/{}", "127.0.0.1:8888", service_name);
-            let mut subscribe_url: Url = consumer_url.parse().unwrap();
-            subscribe_url.add_query_param(InterfaceName::new(service_name));
-
-            let Ok(registry) = fut.await else {
-                error!("registry extension load failed.");
-                return;
-            };
-
-            let receiver = registry.subscribe(subscribe_url).await;
-            debug!("discover start!");
-            match receiver {
-                Err(_e) => {
-                    // error!("discover stream error: {}", e);
-                    debug!("discover stream error");
-                }
-                Ok(mut receiver) => loop {
-                    let change = receiver.recv().await;
-                    debug!("receive change: {:?}", change);
-                    match change {
-                        None => {
-                            debug!("discover stream closed.");
-                            break;
-                        }
-                        Some(change) => {
-                            let _ = tx.send(change).await;
-                        }
-                    }
-                },
-            }
-        });
-
-        Buffer::new(
-            Directory::new(ReceiverStream::new(rx)),
-            Self::MAX_DIRECTORY_BUFFER_SIZE,
-        )
-    }
-}
-
-impl<D> Directory<D> {
-    pub fn new(discover: D) -> Self {
-        Directory {
-            directory: Default::default(),
-            discover,
-            new_invoker: NewInvoker,
-        }
-    }
-}
-
-impl<D> Service<()> for Directory<D>
-where
-    // Discover
-    D: Discover<Key = String> + Unpin + Send,
-    D::Error: Into<StdError>,
-{
-    type Response = Vec<CloneInvoker<TripleInvoker>>;
+    
+    type Response = Box<dyn InvokerList + Send + Sync + 'static>;
 
     type Error = StdError;
 
-    type Future = future::Ready<Result<Self::Response, Self::Error>>;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send + 'static>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        loop {
-            let pin_discover = Pin::new(&mut self.discover);
-
-            match pin_discover.poll_discover(cx) {
-                Poll::Pending => {
-                    if self.directory.is_empty() {
-                        return Poll::Pending;
-                    } else {
-                        return Poll::Ready(Ok(()));
-                    }
-                }
-                Poll::Ready(change) => {
-                    let change = change.transpose().map_err(|e| e.into())?;
-                    match change {
-                        Some(Change::Remove(key)) => {
-                            debug!("remove key: {}", key);
-                            self.directory.remove(&key);
-                        }
-                        Some(Change::Insert(key, _)) => {
-                            debug!("insert key: {}", key);
-                            let invoker = self.new_invoker.new_service(key.clone());
-                            self.directory.insert(key, invoker);
-                        }
-                        None => {
-                            debug!("stream closed");
-                            return Poll::Ready(Ok(()));
-                        }
-                    }
-                }
-            }
-        }
+    fn poll_ready(&mut self, cx: &mut std::task::Context<'_>) -> std::task::Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx)
     }
 
-    fn call(&mut self, _: ()) -> Self::Future {
-        let vec = self
-            .directory
-            .values()
-            .map(|val| val.clone())
-            .collect::<Vec<CloneInvoker<TripleInvoker>>>();
-        future::ok(vec)
+    fn call(&mut self, req: Url) -> Self::Future {
+        let invoke_service_name = req.query::<InvokeServiceName>();
+
+        let Some(invoke_service_name) = invoke_service_name else {
+            return Box::pin(async { Err(InvokerDirectoryBuilderError::new("service name is required").into()) });
+        };
+
+        let invoke_service_name = invoke_service_name.value();
+        
+         // build directory url
+         let invoker_directory_name = InvokerDirectoryName::new(format!("{}-{}", invoke_service_name, self.invoker_directory_type.as_str()));
+         let invoker_directory_service = InvokerDirectoryServiceName::new(&invoke_service_name);
+         let mut invoker_directory_url = extension::invoker_directory_extension::build_invoker_directory_url(invoke_service_name.as_str());
+         invoker_directory_url.add_query_param(invoker_directory_name);
+         invoker_directory_url.add_query_param(invoker_directory_service);
+
+         // build extension url
+         let extension_name = ExtensionName::new(self.invoker_directory_type.as_str());
+         let extension_url = ExtensionUrl::new(invoker_directory_url);
+         let mut invoker_directory_extension_url = extension::build_extension_url(ExtensionType::InvokerDirectory, extension_name);
+         invoker_directory_extension_url.add_query_param(extension_url);
+
+
+         let registry_fut = self.inner.call(req);
+        
+
+        let fut = async move {
+
+            let registry = registry_fut.await?;
+           
+            let mut load_invoker_directory = extension::EXTENSIONS.load_invoker_directory(invoker_directory_extension_url).await?;
+            let _ = load_invoker_directory.ready().await?;
+
+
+            let invoker_list = load_invoker_directory.directory(create_invoker, registry).await?;
+
+            Ok(invoker_list)
+        };
+        Box::pin(fut)
+    }
+}
+
+
+// invoker url: invoker://127.0.0.1:8080?invoker-name=hello-service-invoker&invoker-protocol=trip&invoker-service-name=hello_service
+fn create_invoker(url: Url) -> Pin<Box<dyn Future<Output = Result<Box<dyn Invoker + Send + Sync + 'static>, StdError>>>> {
+    Box::pin(async move {
+        let invoker_protocol = url.query::<InvokerProtocol>();
+        let Some(invoker_protocol) = invoker_protocol else {
+            return Err(InvokerDirectoryBuilderError::new("the invoker protocol is empty").into());
+        };
+        let invoker_protocol = invoker_protocol.value();
+
+        // build protocol url
+        let protocol_type = ProtocolType::new(&invoker_protocol);
+        let mut protocol_url = extension::protocol_extension::build_protocol_url();
+        protocol_url.add_query_param(protocol_type);
+
+        // build extension url
+        let extension_name = ExtensionName::new(&invoker_protocol);
+        let extension_url = ExtensionUrl::new(protocol_url);
+        let mut protocol_extension_url = extension::build_extension_url(ExtensionType::Protocol, extension_name);
+        protocol_extension_url.add_query_param(extension_url);
+
+        // load protocol extension
+        let mut protocol_extension = extension::EXTENSIONS.load_protocol(protocol_extension_url).await?;
+        let _ = protocol_extension.ready().await?;
+
+        let invoker = protocol_extension.reference(url).await?;
+        Ok(invoker)
+    })
+}
+
+impl<N: Clone> Clone for InvokerDirectoryBuilder<N> {
+    fn clone(&self) -> Self {
+        Self { inner: self.inner.clone(), invoker_directory_type: self.invoker_directory_type.clone() }
+    }
+}
+
+#[derive(Debug, Error)]
+#[error("InvokerDirectoryBuilderError: {0}")]
+pub struct InvokerDirectoryBuilderError(String);
+
+impl InvokerDirectoryBuilderError {
+    pub fn new(msg: impl Into<String>) -> Self {
+        InvokerDirectoryBuilderError(msg.into())
     }
 }
