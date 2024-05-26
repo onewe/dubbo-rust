@@ -26,6 +26,7 @@ use tower_service::Service;
 pub mod integration;
 pub mod protocol;
 pub mod registry;
+pub mod n_registry;
 
 #[derive(Clone)]
 pub struct MkRegistryService {

@@ -51,8 +51,11 @@ impl FromStr for ExtensionName {
 
 pub enum ExtensionType {
     Registry,
-    Invoker,
-    Cluster
+    Cluster,
+    LoadBalancer,
+    Router,
+    InvokerDirectory,
+    Protocol,
 }
 
 impl UrlParam for ExtensionType {
@@ -65,16 +68,23 @@ impl UrlParam for ExtensionType {
     fn value(&self) -> Self::TargetType {
         match self {
             ExtensionType::Registry => "registry".to_owned(),
-            ExtensionType::Invoker => "invoker".to_owned(),
             ExtensionType::Cluster => "cluster".to_owned(),
+            ExtensionType::LoadBalancer => "loadbalancer".to_owned(),
+            ExtensionType::Router => "router".to_owned(),
+            ExtensionType::InvokerDirectory => "invoker-directory".to_owned(),
+            ExtensionType::Protocol => "protocol".to_owned(),
         }
     }
 
     fn as_str(&self) -> Cow<str> {
         match self {
             ExtensionType::Registry => "registry".into(),
-            ExtensionType::Invoker => "invoker".into(),
             ExtensionType::Cluster => "cluster".into(),
+            ExtensionType::LoadBalancer => "loadbalancer".into(),
+            ExtensionType::Router => "router".into(),
+            ExtensionType::InvokerDirectory => "invoker-directory".into(),
+            ExtensionType::Protocol => "protocol".into(),
+
         }
     }
 }
@@ -83,8 +93,14 @@ impl FromStr for ExtensionType {
     type Err = Infallible;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
+        let extension_type = s.to_lowercase();
+        match extension_type.as_str() {
             "registry" => Ok(ExtensionType::Registry),
+            "cluster" => Ok(ExtensionType::Cluster),
+            "loadbalancer" => Ok(ExtensionType::LoadBalancer),
+            "router" => Ok(ExtensionType::Router),
+            "invoker-directory" => Ok(ExtensionType::InvokerDirectory),
+            "protocol" => Ok(ExtensionType::Protocol),
             _ => panic!("the extension type enum is not in range"),
         }
     }

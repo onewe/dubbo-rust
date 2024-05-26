@@ -5,13 +5,12 @@ use async_trait::async_trait;
 use futures::Future;
 use thiserror::Error;
 
-use crate::extension::invoker_extension::Invoker;
 use crate::extension::loadbalancer_extension::LoadBalancerChooser;
-use crate::params::cluster_params::ClusterName;
-use crate::params::extension_param::ExtensionType;
+use crate::params::extension_params::{ExtensionName, ExtensionUrl};
 use crate::url::UrlParam;
 use crate::{StdError, Url};
 
+use super::protocol_extension::Invoker;
 use super::LoadExtensionPromise;
 
 // url: cluster://0.0.0.0?cluster-name=failover-cluster&cluster-service-name=hello&cluster-type=failover
@@ -58,29 +57,29 @@ impl ClusterExtensionLoader {
     }
 
 
-    pub fn register(&mut self, cluster_extension_type: String, factory: ClusterExtensionFactory) {
-        self.factories.insert(cluster_extension_type, factory);
+    pub fn register(&mut self, extension_name: String, factory: ClusterExtensionFactory) {
+        self.factories.insert(extension_name, factory);
     }
 
 
-    pub fn remove(&mut self, cluster_extension_type: &str) {
-        self.factories.remove(cluster_extension_type);
+    pub fn remove(&mut self, extension_name: &str) {
+        self.factories.remove(extension_name);
     }
 
     pub fn load(&mut self, url: Url) -> Result<LoadExtensionPromise<Box<dyn Cluster + Send + Sync + 'static>>, StdError> {
-        let cluster_extension_type = url.query::<ExtensionType>();
+        let extension_name = url.query::<ExtensionName>();
 
-        let Some(cluster_extension_type) = cluster_extension_type else {
+        let Some(extension_name) = extension_name else {
             return Err(ClusterExtensionLoaderError::new("load cluster extension failed, cluster extension type mustn't be empty").into());
         };
 
-        let cluster_extension_type = cluster_extension_type.value();
+        let extension_name = extension_name.as_str();
 
-        let factory = self.factories.get_mut(&cluster_extension_type);
+        let factory = self.factories.get_mut(extension_name.as_ref());
         let Some(factory) = factory else {
             let err_msg = format!(
                 "load {} cluster extension failed, can not found cluster extension factory",
-                cluster_extension_type
+                extension_name
             );
             return Err(ClusterExtensionLoaderError(err_msg).into());
         };
@@ -112,15 +111,15 @@ impl ClusterExtensionFactory {
 
 
     pub fn create(&mut self, url: Url) -> Result<LoadExtensionPromise<Box<dyn Cluster + Send + Sync + 'static>>, StdError> {
-        let cluster_name = url.query::<ClusterName>();
+        let extension_url = url.query::<ExtensionUrl>();
 
-        let Some(cluster_name) = cluster_name else {
-            return Err(ClusterExtensionLoaderError::new("load cluster extension failed, cluster name mustn't be empty").into());
+        let Some(extension_url) = extension_url else {
+            return Err(ClusterExtensionLoaderError::new("load cluster extension failed, clusten extension url mustn't be empty").into());
         };
 
-        let cluster_name = cluster_name.value();
+        let extension_url_str = extension_url.as_str();
 
-        match self.instances.get(&cluster_name) {
+        match self.instances.get(extension_url_str.as_ref()) {
             Some(instance) => Ok(instance.clone()),
             None => {
                 let constructor = self.constructor;
@@ -131,8 +130,8 @@ impl ClusterExtensionFactory {
                     }) as Pin<Box<dyn Future<Output = Result<Box<dyn Cluster + Send + Sync + 'static>, StdError>> + Send + 'static>>
                 };
                 
-                let promise = LoadExtensionPromise::new(Box::new(creator), url);
-                self.instances.insert(cluster_name, promise.clone());
+                let promise = LoadExtensionPromise::new(Box::new(creator), extension_url.value());
+                self.instances.insert(extension_url_str.into_owned(), promise.clone());
                 Ok(promise)
             }
         }

@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-use crate::{logger::tracing::error, params::registry_param::InterfaceName, url::UrlParam, Url};
+use crate::{logger::tracing::error, params::registry_params::InterfaceName, url::UrlParam, Url};
 use std::{
     collections::HashMap,
     sync::{Arc, RwLock},

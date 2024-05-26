@@ -4,8 +4,6 @@ use std::{borrow::Cow, str::FromStr};
 
 use crate::{url::UrlParam, StdError};
 
-
-
 pub struct InvokeServiceName(String);
 
 impl InvokeServiceName {

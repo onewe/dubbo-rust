@@ -42,9 +42,11 @@ use tower::{
 
 use crate::{
     extension::registry_extension::{proxy::RegistryProxy, Registry},
-    params::registry_param::InterfaceName,
+    params::registry_params::InterfaceName,
 };
 use tower_service::Service;
+
+pub mod n_invoker_directory;
 
 type BufferedDirectory =
     Buffer<Directory<ReceiverStream<Result<Change<String, ()>, StdError>>>, ()>;

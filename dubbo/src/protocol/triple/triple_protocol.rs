@@ -21,7 +21,7 @@ use super::{
     triple_exporter::TripleExporter, triple_invoker::TripleInvoker, triple_server::TripleServer,
 };
 use crate::{
-    params::registry_param::InterfaceName,
+    params::registry_params::InterfaceName,
     protocol::{BoxExporter, Protocol},
     url::UrlParam,
     Url,

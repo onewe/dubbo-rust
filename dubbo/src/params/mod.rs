@@ -19,7 +19,12 @@
     allow(dead_code, unused_imports, unused_variables, unused_mut)
 )]
 pub mod constants;
-pub mod extension_param;
-pub mod registry_param;
+pub mod extension_params;
+pub mod registry_params;
 pub mod cluster_params;
-pub mod invoke_param;
+pub mod invoke_params;
+pub mod invoker_params;
+pub mod load_balancer_params;
+pub mod router_params;
+pub mod invoker_direcotry_params;
+pub mod protocol_params;

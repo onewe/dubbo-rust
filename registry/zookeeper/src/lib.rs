@@ -32,7 +32,7 @@ use zookeeper::{Acl, CreateMode, WatchedEvent, WatchedEventType, Watcher, ZooKee
 
 use dubbo::{
     extension::registry_extension::{DiscoverStream, Registry, ServiceChange},
-    params::registry_param::InterfaceName,
+    params::registry_params::InterfaceName,
 };
 
 // Get metadata of a service registration from a URL

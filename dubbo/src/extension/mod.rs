@@ -15,18 +15,18 @@
  * limitations under the License.
  */
 
-pub mod invoker_extension;
+
 pub mod registry_extension;
 pub mod cluster_extension;
 pub mod loadbalancer_extension;
 pub mod invoker_directory_extension;
 pub mod route_extension;
-mod protocol_extension;
+pub mod protocol_extension;
 
 use crate::{
     extension::registry_extension::RegistryExtension,
     logger::tracing::{error, info},
-    params::extension_param::{ExtensionName, ExtensionType},
+    params::extension_params::{ExtensionName, ExtensionType},
     registry::registry::StaticRegistry,
     url::UrlParam,
     StdError, Url,
@@ -35,8 +35,9 @@ use std::{future::Future, pin::Pin, sync::Arc};
 use cluster_extension::Cluster;
 use thiserror::Error;
 use tokio::sync::{oneshot, RwLock};
-use crate::extension::invoker_extension::Invoker;
 use crate::extension::registry_extension::Registry;
+
+use self::{invoker_directory_extension::InvokerDirectory, loadbalancer_extension::LoadBalancer, protocol_extension::Protocol, route_extension::Router};
 
 pub static EXTENSIONS: once_cell::sync::Lazy<ExtensionDirectoryCommander> =
     once_cell::sync::Lazy::new(|| ExtensionDirectory::init());
@@ -44,8 +45,11 @@ pub static EXTENSIONS: once_cell::sync::Lazy<ExtensionDirectoryCommander> =
 #[derive(Default)]
 struct ExtensionDirectory {
     registry_extension_loader: registry_extension::RegistryExtensionLoader,
-    invoker_extension_loader: invoker_extension::InvokerExtensionLoader,
     cluster_extension_loader: cluster_extension::ClusterExtensionLoader,
+    load_balancer_extension_loader: loadbalancer_extension::LoadBalancerExtensionLoader,
+    router_extension_loader: route_extension::RouterExtensionLoader,
+    invoker_directory_extension_loader: invoker_directory_extension::InvokerDirectoryExtensionLoader,
+    protocol_extension_loader: protocol_extension::ProtocolExtensionLoader,
 }
 
 impl ExtensionDirectory {
@@ -106,14 +110,6 @@ impl ExtensionDirectory {
                 }
                 _ => Ok(()),
             },
-            ExtensionType::Invoker => match extension_factories {
-                ExtensionFactories::InvokerExtensionFactory(invoker_extension_factory) => {
-                    self.invoker_extension_loader
-                        .register(extension_name, invoker_extension_factory);
-                    Ok(())
-                }
-                _ => Ok(()),
-            },
             ExtensionType::Cluster => match extension_factories {
                 ExtensionFactories::ClusterExtensionFactory(cluster_extension_factory) => {
                     self.cluster_extension_loader
@@ -121,7 +117,39 @@ impl ExtensionDirectory {
                     Ok(())
                 }
                 _ => Ok(()),
-            }
+            },
+            ExtensionType::LoadBalancer => match extension_factories {
+                ExtensionFactories::LoadBalancerExtensionFactory(load_balancer_extension_factory) => {
+                    self.load_balancer_extension_loader
+                        .register(extension_name, load_balancer_extension_factory);
+                    Ok(())
+                },
+                _ => Ok(()),
+            },
+            ExtensionType::Router => match extension_factories {
+                ExtensionFactories::RouterExtensionFactory(router_extension_factory) => {
+                    self.router_extension_loader
+                        .register(extension_name, router_extension_factory);
+                    Ok(())
+                },
+                _ => Ok(()),
+            },
+            ExtensionType::InvokerDirectory => match extension_factories {
+                ExtensionFactories::InvokerDirectoryExtensionFactory(invoker_directory_extension_factory) => {
+                    self.invoker_directory_extension_loader
+                        .register(extension_name, invoker_directory_extension_factory);
+                    Ok(())
+                },
+                _ => Ok(()),
+            },
+            ExtensionType::Protocol => match extension_factories {
+                ExtensionFactories::ProtocolExtensionFactory(protocol_extension_factory) => {
+                    self.protocol_extension_loader
+                        .register(extension_name, protocol_extension_factory);
+                    Ok(())
+                },
+                _ => Ok(()),
+            },
         }
     }
 
@@ -132,17 +160,29 @@ impl ExtensionDirectory {
     ) -> Result<(), StdError> {
         match extension_type {
             ExtensionType::Registry => {
-                self.registry_extension_loader.remove(extension_name);
-                Ok(())
-            }
-            ExtensionType::Invoker => {
-                self.invoker_extension_loader.remove(extension_name);
+                self.registry_extension_loader.remove(&extension_name);
                 Ok(())
             },
             ExtensionType::Cluster => {
                 self.cluster_extension_loader.remove(&extension_name);
                 Ok(())
-            }
+            },
+            ExtensionType::LoadBalancer => {
+                self.load_balancer_extension_loader.remove(&extension_name);
+                Ok(())
+            },
+            ExtensionType::Router => {
+                self.router_extension_loader.remove(&extension_name);
+                Ok(())
+            },
+            ExtensionType::InvokerDirectory => {
+                self.invoker_directory_extension_loader.remove(&extension_name);
+                Ok(())
+            },
+            ExtensionType::Protocol => {
+                self.protocol_extension_loader.remove(&extension_name);
+                Ok(())
+            },
         }
     }
 
@@ -175,29 +215,6 @@ impl ExtensionDirectory {
                         let _ = callback.send(Err(err));
                     }
                 }
-            }
-            ExtensionType::Invoker => {
-                let extension = self.invoker_extension_loader.load(url);
-                match extension {
-                    Ok(mut extension) => {
-                        tokio::spawn(async move {
-                            let invoker = extension.resolve().await;
-                            match invoker {
-                                Ok(invoker) => {
-                                    let _ = callback.send(Ok(Extensions::Invoker(invoker)));
-                                }
-                                Err(err) => {
-                                    error!("load invoker extension failed: {}", err);
-                                    let _ = callback.send(Err(err));
-                                }
-                            }
-                        });
-                    }
-                    Err(err) => {
-                        error!("load invoker extension failed: {}", err);
-                        let _ = callback.send(Err(err));
-                    }
-                }
             },
             ExtensionType::Cluster => {
                 let extension = self.cluster_extension_loader.load(url);
@@ -222,7 +239,99 @@ impl ExtensionDirectory {
                     }
                 }
             
-            }
+            },
+            ExtensionType::LoadBalancer => {
+                let extension = self.load_balancer_extension_loader.load(url);
+                match extension {
+                    Ok(mut extension) => {
+                        tokio::spawn(async move {
+                            let load_balancer = extension.resolve().await;
+                            match load_balancer {
+                                Ok(load_balancer) => {
+                                    let _ = callback.send(Ok(Extensions::LoadBalancer(load_balancer)));
+                                }
+                                Err(err) => {
+                                    error!("load loadBalancer extension failed: {}", err);
+                                    let _ = callback.send(Err(err));
+                                }
+                            }
+                        });
+                    }
+                    Err(err) => {
+                        error!("load loadBalancer extension failed: {}", err);
+                        let _ = callback.send(Err(err));
+                    }
+                }
+            },
+            ExtensionType::Router => {
+                let extension = self.router_extension_loader.load(url);
+                match extension {
+                    Ok(mut extension) => {
+                        tokio::spawn(async move {
+                            let router = extension.resolve().await;
+                            match router {
+                                Ok(router) => {
+                                    let _ = callback.send(Ok(Extensions::Router(router)));
+                                }
+                                Err(err) => {
+                                    error!("load router extension failed: {}", err);
+                                    let _ = callback.send(Err(err));
+                                }
+                            }
+                        });
+                    }
+                    Err(err) => {
+                        error!("load router extension failed: {}", err);
+                        let _ = callback.send(Err(err));
+                    }
+                }
+            },
+            ExtensionType::InvokerDirectory => {
+                let extension = self.invoker_directory_extension_loader.load(url);
+                match extension {
+                    Ok(mut extension) => {
+                        tokio::spawn(async move {
+                            let invoker_directory = extension.resolve().await;
+                            match invoker_directory {
+                                Ok(invoker_directory) => {
+                                    let _ = callback.send(Ok(Extensions::InvokerDirectory(invoker_directory)));
+                                }
+                                Err(err) => {
+                                    error!("load invoker directory extension failed: {}", err);
+                                    let _ = callback.send(Err(err));
+                                }
+                            }
+                        });
+                    }
+                    Err(err) => {
+                        error!("load invoker directory extension failed: {}", err);
+                        let _ = callback.send(Err(err));
+                    }
+                }
+            },
+            ExtensionType::Protocol => {
+                let extension = self.protocol_extension_loader.load(url);
+                match extension {
+                    Ok(mut extension) => {
+                        tokio::spawn(async move {
+                            let protocol = extension.resolve().await;
+                            match protocol {
+                                Ok(protocol) => {
+                                    let _ = callback.send(Ok(Extensions::Protocol(protocol)));
+                                }
+                                Err(err) => {
+                                    error!("load protocol extension failed: {}", err);
+                                    let _ = callback.send(Err(err));
+                                }
+                            }
+                        });
+                    }
+                    Err(err) => {
+                        error!("load protocol extension failed: {}", err);
+                        let _ = callback.send(Err(err));
+                    }
+                }
+            },
         }
     }
 }
@@ -441,42 +550,6 @@ impl ExtensionDirectoryCommander {
         }
     }
 
-    pub async fn load_invoker(&self, url: Url) -> Result<Box<dyn Invoker + Send + Sync + 'static>, StdError> {
-        let url_str = url.to_string();
-        info!("load invoker extension: {}", url_str);
-
-        let (tx, rx) = oneshot::channel();
-
-        let send = self
-            .sender
-            .send(ExtensionOpt::Load(url, ExtensionType::Invoker, tx))
-            .await;
-
-        let Ok(_) = send else {
-            let err_msg = format!("load invoker extension failed: {}", url_str);
-            return Err(LoadExtensionError::new(err_msg).into());
-        };
-
-        let extensions = rx.await;
-
-        let Ok(extension) = extensions else {
-            let err_msg = format!("load invoker extension failed: {}", url_str);
-            return Err(LoadExtensionError::new(err_msg).into());
-        };
-
-        let Ok(extensions) = extension else {
-            let err_msg = format!("load invoker extension failed: {}", url_str);
-            return Err(LoadExtensionError::new(err_msg).into());
-        };
-
-        match extensions {
-            Extensions::Invoker(proxy) => Ok(proxy),
-            _ => {
-                panic!("load invoker extension failed: invalid extension type");
-            }
-        }
-    }
-
 
     pub async fn load_cluster(&self, url: Url) -> Result<Box<dyn Cluster + Send + Sync + 'static>, StdError> {
 
@@ -515,6 +588,152 @@ impl ExtensionDirectoryCommander {
         }
 
     }
+
+    pub async fn load_load_balancer(&self, url: Url) -> Result<Box<dyn LoadBalancer + Send + Sync + 'static>, StdError> {
+        let url_str = url.to_string();
+        info!("load loadBalancer extension: {}", url_str);
+
+        let (tx, rx) = oneshot::channel();
+
+        let send = self
+            .sender
+            .send(ExtensionOpt::Load(url, ExtensionType::LoadBalancer, tx))
+            .await;
+
+        let Ok(_) = send else {
+            let err_msg = format!("load loadBalancer extension failed: {}", url_str);
+            return Err(LoadExtensionError::new(err_msg).into());
+        };
+
+        let extensions = rx.await;
+
+        let Ok(extension) = extensions else {
+            let err_msg = format!("load loadBalancer extension failed: {}", url_str);
+            return Err(LoadExtensionError::new(err_msg).into());
+        };
+
+        let Ok(extensions) = extension else {
+            let err_msg = format!("load loadBalancer extension failed: {}", url_str);
+            return Err(LoadExtensionError::new(err_msg).into());
+        };
+
+        match extensions {
+            Extensions::LoadBalancer(proxy) => Ok(proxy),
+            _ => {
+                panic!("load loadBalancer extension failed: invalid extension type");
+            }
+        }
+    }
+
+
+    pub async fn load_router(&self, url: Url) -> Result<Box<dyn Router + Send + Sync + 'static>, StdError> {
+        let url_str = url.to_string();
+        info!("load router extension: {}", url_str);
+
+        let (tx, rx) = oneshot::channel();
+
+        let send = self
+            .sender
+            .send(ExtensionOpt::Load(url, ExtensionType::Router, tx))
+            .await;
+
+        let Ok(_) = send else {
+            let err_msg = format!("load router extension failed: {}", url_str);
+            return Err(LoadExtensionError::new(err_msg).into());
+        };
+
+        let extensions = rx.await;
+
+        let Ok(extension) = extensions else {
+            let err_msg = format!("load router extension failed: {}", url_str);
+            return Err(LoadExtensionError::new(err_msg).into());
+        };
+
+        let Ok(extensions) = extension else {
+            let err_msg = format!("load router extension failed: {}", url_str);
+            return Err(LoadExtensionError::new(err_msg).into());
+        };
+
+        match extensions {
+            Extensions::Router(proxy) => Ok(proxy),
+            _ => {
+                panic!("load router extension failed: invalid extension type");
+            }
+        }
+    }
+
+    pub async fn load_invoker_directory(&self, url: Url) -> Result<Box<dyn InvokerDirectory + Send + Sync + 'static>, StdError> {
+        let url_str = url.to_string();
+        info!("load invoker directory extension: {}", url_str);
+
+        let (tx, rx) = oneshot::channel();
+
+        let send = self
+            .sender
+            .send(ExtensionOpt::Load(url, ExtensionType::InvokerDirectory, tx))
+            .await;
+
+        let Ok(_) = send else {
+            let err_msg = format!("load invoker directory extension failed: {}", url_str);
+            return Err(LoadExtensionError::new(err_msg).into());
+        };
+
+        let extensions = rx.await;
+
+        let Ok(extension) = extensions else {
+            let err_msg = format!("load invoker directory extension failed: {}", url_str);
+            return Err(LoadExtensionError::new(err_msg).into());
+        };
+
+        let Ok(extensions) = extension else {
+            let err_msg = format!("load invoker directory extension failed: {}", url_str);
+            return Err(LoadExtensionError::new(err_msg).into());
+        };
+
+        match extensions {
+            Extensions::InvokerDirectory(proxy) => Ok(proxy),
+            _ => {
+                panic!("load invoker directory extension failed: invalid extension type");
+            }
+        }
+    }
+
+
+    pub async fn load_protocol(&self, url: Url) -> Result<Box<dyn Protocol + Send + Sync + 'static>, StdError> {
+        let url_str = url.to_string();
+        info!("load protocol extension: {}", url_str);
+
+        let (tx, rx) = oneshot::channel();
+
+        let send = self
+            .sender
+            .send(ExtensionOpt::Load(url, ExtensionType::Protocol, tx))
+            .await;
+
+        let Ok(_) = send else {
+            let err_msg = format!("load protocol extension failed: {}", url_str);
+            return Err(LoadExtensionError::new(err_msg).into());
+        };
+
+        let extensions = rx.await;
+
+        let Ok(extension) = extensions else {
+            let err_msg = format!("load protocol extension failed: {}", url_str);
+            return Err(LoadExtensionError::new(err_msg).into());
+        };
+
+        let Ok(extensions) = extension else {
+            let err_msg = format!("load protocol extension failed: {}", url_str);
+            return Err(LoadExtensionError::new(err_msg).into());
+        };
+
+        match extensions {
+            Extensions::Protocol(proxy) => Ok(proxy),
+            _ => {
+                panic!("load protocol extension failed: invalid extension type");
+            }
+        }
+    }
 }
 
 enum ExtensionOpt {
@@ -551,14 +770,20 @@ pub(crate) trait ExtensionMetaInfo {
 
 pub(crate) enum Extensions {
     Registry(Box<dyn Registry + Send + Sync + 'static>),
-    Invoker(Box<dyn Invoker + Send + Sync + 'static>),
-    Cluster(Box<dyn Cluster + Send + Sync + 'static>)
+    Cluster(Box<dyn Cluster + Send + Sync + 'static>),
+    LoadBalancer(Box<dyn LoadBalancer + Send + Sync + 'static>),
+    Router(Box<dyn Router + Send + Sync + 'static>),
+    InvokerDirectory(Box<dyn InvokerDirectory + Send + Sync + 'static>),
+    Protocol(Box<dyn Protocol + Send + Sync + 'static>),
 }
 
 pub(crate) enum ExtensionFactories {
     RegistryExtensionFactory(registry_extension::RegistryExtensionFactory),
-    InvokerExtensionFactory(invoker_extension::InvokerExtensionFactory),
     ClusterExtensionFactory(cluster_extension::ClusterExtensionFactory),
+    LoadBalancerExtensionFactory(loadbalancer_extension::LoadBalancerExtensionFactory),
+    RouterExtensionFactory(route_extension::RouterExtensionFactory),
+    InvokerDirectoryExtensionFactory(invoker_directory_extension::InvokerDirectoryExtensionFactory),
+    ProtocolExtensionFactory(protocol_extension::ProtocolExtensionFactory),
 }
 
 

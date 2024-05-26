@@ -23,7 +23,7 @@ use std::{
 
 use crate::{
     logger::tracing::{error, info, warn},
-    params::registry_param::InterfaceName,
+    params::registry_params::InterfaceName,
     url::UrlParam,
     Url,
 };

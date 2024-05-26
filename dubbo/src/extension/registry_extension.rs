@@ -21,10 +21,9 @@ use async_trait::async_trait;
 use thiserror::Error;
 use tokio::sync::mpsc::Receiver;
 use tower::discover::Change;
-use url::form_urlencoded::Target;
 
 use crate::{
-    params::{extension_param::ExtensionName, registry_param::RegistryUrl},
+    params::extension_params::{ExtensionName, ExtensionUrl},
     url::UrlParam,
     StdError, Url,
 };
@@ -33,24 +32,11 @@ use crate::extension::{
     Extension, ExtensionFactories, ExtensionMetaInfo, ExtensionType, LoadExtensionPromise,
 };
 
-// extension://0.0.0.0/?extension-type=registry&extension-name=nacos&registry-url=nacos://127.0.0.1:8848
-pub fn to_extension_url(registry_url: Url) -> Url {
-    let mut registry_extension_loader_url: Url = "extension://0.0.0.0".parse().unwrap();
-
-    let protocol = registry_url.protocol();
-
-    registry_extension_loader_url.add_query_param(ExtensionType::Registry);
-    registry_extension_loader_url.add_query_param(ExtensionName::new(protocol.to_string()));
-    registry_extension_loader_url.add_query_param(RegistryUrl::new(registry_url));
-
-    registry_extension_loader_url
-}
-
 pub type ServiceChange = Change<String, ()>;
 pub type DiscoverStream = Receiver<Result<ServiceChange, StdError>>;
 
-// url: registry://127.0.0.1:8848?protocol=nacos
-// extension_url: extension://0.0.0.0?extension-type=registry&extension-name=nacos&registry-url=registry://127.0.0.1:8848?protocol=nacos
+// url: registry://127.0.0.1:8848?registry-type=nacos&registry-service-name=hello-service
+// extension_url: extension://0.0.0.0?extension-type=registry&extension-name=nacos&extension-url=registry://127.0.0.1:8848?registry-type=nacos&registry-service-name=hello-service
 #[async_trait]
 pub trait Registry {
     async fn register(&mut self, url: Url) -> Result<(), StdError>;
@@ -109,39 +95,49 @@ impl RegistryExtensionLoader {
         self.factories.insert(extension_name, factory);
     }
 
-    pub(crate) fn remove(&mut self, extension_name: String) {
-        self.factories.remove(&extension_name);
+    pub(crate) fn remove(&mut self, extension_name: &str) {
+        self.factories.remove(extension_name);
     }
 
     pub(crate) fn load(
         &mut self,
         url: Url,
     ) -> Result<LoadExtensionPromise<Box<dyn Registry + Send + Sync + 'static>>, StdError> {
-        let extension_name = url.query::<ExtensionName>().unwrap();
+        let extension_name = url.query::<ExtensionName>();
+        let Some(extension_name) = extension_name else {
+            return Err(RegistryExtensionLoaderError::new(
+                "load registry extension failed, registry extension name mustn't be empty",
+            )
+            .into());
+        };
         let extension_name = extension_name.value();
-        let factory = self.factories.get_mut(&extension_name).ok_or_else(|| {
-            RegistryExtensionLoaderError::new(format!(
-                "registry extension loader error: extension name {} not found",
-                extension_name
-            ))
-        })?;
+        let factory = self.factories.get_mut(&extension_name);
+        let Some(factory) = factory else {
+            return Err(RegistryExtensionLoaderError::new(
+                format!(
+                    "load {} registry extension failed, can not found registry extension factory",
+                    extension_name
+                ),
+            )
+            .into());
+        };
         factory.create(url)
     }
 }
 
-type RegistryConstructor = fn(
+type Constructor = fn(
     Url,
 ) -> Pin<
     Box<dyn Future<Output = Result<Box<dyn Registry + Send + Sync + 'static>, StdError>> + Send>,
 >;
 
 pub(crate) struct RegistryExtensionFactory {
-    constructor: RegistryConstructor,
+    constructor: Constructor,
     instances: HashMap<String, LoadExtensionPromise<Box<dyn Registry + Send + Sync + 'static>>>,
 }
 
 impl RegistryExtensionFactory {
-    pub(super) fn new(constructor: RegistryConstructor) -> Self {
+    pub(super) fn new(constructor: Constructor) -> Self {
         Self {
             constructor,
             instances: HashMap::new(),
@@ -154,10 +150,15 @@ impl RegistryExtensionFactory {
         &mut self,
         url: Url,
     ) -> Result<LoadExtensionPromise<Box<dyn Registry + Send + Sync + 'static>>, StdError> {
-        let registry_url = url.query::<RegistryUrl>().unwrap();
-        let registry_url = registry_url.value();
-        let url_str = registry_url.as_str().to_string();
-        match self.instances.get(&url_str) {
+        let extension_url = url.query::<ExtensionUrl>();
+        let Some(extension_url) = extension_url else {
+            return Err(RegistryExtensionLoaderError::new(
+                "load registry extension failed, registry extension url mustn't be empty",
+            )
+            .into());
+        };
+        let extension_url_str = extension_url.as_str();
+        match self.instances.get(extension_url_str.as_ref()) {
             Some(instance) => {
                 let instance = instance.clone();
                 Ok(instance)
@@ -179,8 +180,8 @@ impl RegistryExtensionFactory {
                         >
                 };
 
-                let promise = LoadExtensionPromise::new(Box::new(creator), url);
-                self.instances.insert(url_str, promise.clone());
+                let promise = LoadExtensionPromise::new(Box::new(creator), extension_url.value());
+                self.instances.insert(extension_url_str.into(), promise.clone());
                 Ok(promise)
             }
         }
@@ -192,7 +193,7 @@ impl RegistryExtensionFactory {
 pub(crate) struct RegistryExtensionLoaderError(String);
 
 impl RegistryExtensionLoaderError {
-    pub(crate) fn new(msg: String) -> Self {
-        RegistryExtensionLoaderError(msg)
+    pub(crate) fn new(msg: impl Into<String>) -> Self {
+        RegistryExtensionLoaderError(msg.into())
     }
 }

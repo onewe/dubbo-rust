@@ -26,7 +26,7 @@ use dubbo::{
         Extension,
     },
     logger::tracing::info,
-    params::registry_param::{
+    params::registry_params::{
         AppName, Category, Group, InterfaceName, RegistryUrl, ServiceNamespace, Version,
     },
 };
@@ -422,7 +422,7 @@ pub mod tests {
     use std::thread;
     use tracing::error;
 
-    use dubbo::params::{extension_param::ExtensionName, registry_param::Side};
+    use dubbo::params::{extension_params::ExtensionName, registry_params::Side};
     use tracing::metadata::LevelFilter;
 
     use super::*;

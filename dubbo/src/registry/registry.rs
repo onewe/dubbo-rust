@@ -26,8 +26,8 @@ use tokio::sync::{
 
 use crate::{
     params::{
-        extension_param::{ExtensionName, ExtensionType},
-        registry_param::{InterfaceName, RegistryUrl, StaticInvokerUrls},
+        extension_params::{ExtensionName, ExtensionType},
+        registry_params::{InterfaceName, RegistryUrl, StaticInvokerUrls},
     },
     url::UrlParam,
     StdError, Url,
