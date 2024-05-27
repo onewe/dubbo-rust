@@ -24,15 +24,13 @@ pub mod route_extension;
 pub mod protocol_extension;
 
 use crate::{
-    logger::tracing::{error, info},
-    params::extension_params::{ExtensionName, ExtensionType},
-    url::UrlParam,
-    StdError, Url,
+    common::url::{params::extension_params::{ExtensionName, ExtensionType}, Url, UrlParam}, StdError
 };
 use std::{future::Future, pin::Pin, sync::Arc};
 use cluster_extension::Cluster;
 use thiserror::Error;
 use tokio::sync::{oneshot, RwLock};
+use tracing::{error, info};
 use crate::extension::registry_extension::Registry;
 
 use self::{invoker_directory_extension::InvokerDirectory, loadbalancer_extension::LoadBalancer, protocol_extension::Protocol, route_extension::Router};
@@ -373,7 +371,7 @@ where
     }
 }
 
-pub(crate) struct LoadExtensionPromise<T> {
+pub struct LoadExtensionPromise<T> {
     resolver: Arc<RwLock<ExtensionPromiseResolver<T>>>,
 }
 

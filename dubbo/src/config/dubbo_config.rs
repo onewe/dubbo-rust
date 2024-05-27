@@ -1,5 +1,4 @@
-use crate::{params::{cluster_params::ClusterType, invoker_direcotry_params::InvokerDirectoryType, load_balancer_params::LoadBalancerType, router_params::RouterType}, Url};
-
+use crate::common::url::{params::{cluster_params::ClusterType, invoker_direcotry_params::InvokerDirectoryType, load_balancer_params::LoadBalancerType, router_params::RouterType}, Url};
 
 
 #[derive(Clone)]

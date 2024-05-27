@@ -6,9 +6,9 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{Future, Stream};
 use thiserror::Error;
-use crate::params::extension_params::{ExtensionName, ExtensionUrl};
-use crate::url::UrlParam;
-use crate::{StdError, Url};
+use crate::common::url::params::extension_params::{ExtensionName, ExtensionUrl};
+use crate::common::url::{Url, UrlParam};
+use crate::StdError;
 
 use super::LoadExtensionPromise;
 
@@ -46,10 +46,8 @@ pub fn build_protocol_url() -> Url {
 // invoker://127.0.0.1:8080?invoker-name=hello-service-invoker&invoker-protocol=trip&invoker-service-name=hello_service
 #[async_trait]
 pub trait Invoker {
-    async fn invoke(
-        &mut self,
-        invocation: GrpcInvocation,
-    ) -> Result<Pin<Box<dyn Stream<Item = Bytes> + Send + 'static>>, StdError>;
+
+    async fn invoke(&mut self,invocation: GrpcInvocation) -> Result<Pin<Box<dyn Stream<Item = Bytes> + Send + 'static>>, StdError>;
 
     async fn ready(&mut self) -> Result<(), StdError>;
 
@@ -84,10 +82,9 @@ pub struct Argument {
     value: Box<dyn Stream<Item = Box<dyn Serializable + Send + 'static>> + Send + 'static>,
 }
 
-pub trait Serializable {
-    fn serialize(&self, serialization_type: String) -> Result<Bytes, StdError>;
+pub trait Serializable{
 
-    fn into_any(self) -> Box<dyn Any + Send + 'static>;
+    fn serialize(&self, serialization_type: String) -> Result<Bytes, StdError>;
 }
 
 pub trait Deserializable {

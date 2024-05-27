@@ -4,10 +4,12 @@ use std::pin::Pin;
 use std::sync::Arc;
 use async_trait::async_trait;
 use thiserror::Error;
+use crate::common::url::params::extension_params::ExtensionName;
+use crate::common::url::params::extension_params::ExtensionUrl;
+use crate::common::url::Url;
+use crate::common::url::UrlParam;
 use crate::extension::registry_extension::Registry;
-use crate::params::extension_params::{ExtensionName, ExtensionUrl};
-use crate::url::UrlParam;
-use crate::{StdError, Url};
+use crate::StdError;
 
 use super::protocol_extension::Invoker;
 use super::LoadExtensionPromise;

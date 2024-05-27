@@ -15,12 +15,12 @@
  * limitations under the License.
  */
 
-pub use config::*;
+// pub use config::*;
 
-pub mod config;
-pub mod protocol;
-pub mod provider;
-pub mod registry;
-pub mod router;
-pub mod service;
+// pub mod config;
+// pub mod protocol;
+// pub mod provider;
+// pub mod registry;
+// pub mod router;
+// pub mod service;
 pub mod dubbo_config;

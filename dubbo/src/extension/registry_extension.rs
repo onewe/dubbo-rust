@@ -22,10 +22,10 @@ use thiserror::Error;
 use tokio::sync::mpsc::Receiver;
 use tower::discover::Change;
 
+use crate::common::url::params::extension_params::{ExtensionName, ExtensionUrl};
+use crate::common::url::UrlParam;
 use crate::{
-    params::extension_params::{ExtensionName, ExtensionUrl},
-    url::UrlParam,
-    StdError, Url,
+    common::url::Url,  StdError
 };
 
 use crate::extension::{

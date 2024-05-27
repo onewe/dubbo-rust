@@ -4,9 +4,9 @@ use std::pin::Pin;
 use async_trait::async_trait;
 use futures::Future;
 use thiserror::Error;
-use crate::params::extension_params::{ExtensionName, ExtensionUrl};
-use crate::url::UrlParam;
-use crate::{StdError, Url};
+use crate::common::url::params::extension_params::{ExtensionName, ExtensionUrl};
+use crate::common::url::{Url, UrlParam};
+use crate::StdError;
 
 use super::protocol_extension::Invoker;
 use super::LoadExtensionPromise;

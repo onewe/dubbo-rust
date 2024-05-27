@@ -16,7 +16,7 @@
  */
 use tower::Service;
 
-use crate::{config::dubbo_config::DubboConfig, extension::{self, registry_extension::Registry}, params::{extension_params::{ExtensionName, ExtensionType, ExtensionUrl}, registry_params::RegistryType}, url::UrlParam, StdError, Url};
+use crate::{common::url::{params::{extension_params::{ExtensionName, ExtensionType, ExtensionUrl}, registry_params::RegistryType}, Url, UrlParam}, config::dubbo_config::DubboConfig, extension::{self, registry_extension::Registry}, StdError};
 
 pub struct MkRegistryBuilder;
 
