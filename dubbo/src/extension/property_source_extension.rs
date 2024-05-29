@@ -18,7 +18,9 @@ pub trait PropertySource {
 
     async fn get_property(&self, key: &str) -> Option<String>;
 
-    async fn watch(&self, key: &str) -> Result<watch::Receiver<String>, StdError>;
+    async fn watch(&mut self, key: &str) -> Result<watch::Receiver<String>, StdError>;
+
+    async fn ready(&mut self) -> Result<(), StdError>;
 
     fn order(&self) -> i32;
 

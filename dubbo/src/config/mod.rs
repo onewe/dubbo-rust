@@ -15,12 +15,11 @@
  * limitations under the License.
  */
 
-// pub use config::*;
 
-// pub mod config;
-// pub mod protocol;
-// pub mod provider;
-// pub mod registry;
-// pub mod router;
-// pub mod service;
+pub mod cluster_config;
+pub mod invoker_directory_config;
+pub mod load_balancer_config;
+pub mod property_source_config;
+pub mod registry_config;
+pub mod route_config;
 pub mod dubbo_config;

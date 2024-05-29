@@ -92,7 +92,7 @@ impl ClusterExtensionLoader {
 
 type ClusterExtensionConstructor = fn(Url) -> Pin<Box<dyn Future<Output = Result<Box<dyn Cluster + Send + Sync + 'static>, StdError>> + Send + 'static>>;
 
-pub(super) struct ClusterExtensionFactory {
+pub struct ClusterExtensionFactory {
 
     constructor: ClusterExtensionConstructor,
     instances: HashMap<String, LoadExtensionPromise<Box<dyn Cluster + Send + Sync + 'static>>>,

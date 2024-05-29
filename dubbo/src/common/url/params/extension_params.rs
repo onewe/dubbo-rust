@@ -58,6 +58,7 @@ pub enum ExtensionType {
     Router,
     InvokerDirectory,
     Protocol,
+    PropertySource
 }
 
 impl UrlParam for ExtensionType {
@@ -75,6 +76,7 @@ impl UrlParam for ExtensionType {
             ExtensionType::Router => "router".to_owned(),
             ExtensionType::InvokerDirectory => "invoker-directory".to_owned(),
             ExtensionType::Protocol => "protocol".to_owned(),
+            ExtensionType::PropertySource => "property-source".to_owned(),
         }
     }
 
@@ -86,6 +88,7 @@ impl UrlParam for ExtensionType {
             ExtensionType::Router => "router".into(),
             ExtensionType::InvokerDirectory => "invoker-directory".into(),
             ExtensionType::Protocol => "protocol".into(),
+            ExtensionType::PropertySource => "property-source".into(),
 
         }
     }
@@ -103,6 +106,7 @@ impl FromStr for ExtensionType {
             "router" => Ok(ExtensionType::Router),
             "invoker-directory" => Ok(ExtensionType::InvokerDirectory),
             "protocol" => Ok(ExtensionType::Protocol),
+            "property-source" => Ok(ExtensionType::PropertySource),
             _ => panic!("the extension type enum is not in range"),
         }
     }

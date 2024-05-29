@@ -29,6 +29,7 @@ use crate::{
 };
 use std::{future::Future, pin::Pin, sync::Arc};
 use cluster_extension::Cluster;
+use property_source_extension::PropertySource;
 use thiserror::Error;
 use tokio::sync::{oneshot, RwLock};
 use tracing::{error, info};
@@ -47,6 +48,7 @@ struct ExtensionDirectory {
     router_extension_loader: route_extension::RouterExtensionLoader,
     invoker_directory_extension_loader: invoker_directory_extension::InvokerDirectoryExtensionLoader,
     protocol_extension_loader: protocol_extension::ProtocolExtensionLoader,
+    property_source_extension_loader: property_source_extension::PropertySourceExtensionLoader,
 }
 
 impl ExtensionDirectory {
@@ -141,6 +143,14 @@ impl ExtensionDirectory {
                 },
                 _ => Ok(()),
             },
+            ExtensionType::PropertySource => match extension_factories {
+                ExtensionFactories::PropertySourceExtensionFactory(property_source_extension_factory) => {
+                    self.property_source_extension_loader
+                        .register(extension_name, property_source_extension_factory);
+                    Ok(())
+                },
+                _ => Ok(()),
+            },
         }
     }
 
@@ -172,6 +182,10 @@ impl ExtensionDirectory {
             },
             ExtensionType::Protocol => {
                 self.protocol_extension_loader.remove(&extension_name);
+                Ok(())
+            },
+            ExtensionType::PropertySource => {
+                self.property_source_extension_loader.remove(&extension_name);
                 Ok(())
             },
         }
@@ -319,6 +333,29 @@ impl ExtensionDirectory {
                     }
                     Err(err) => {
                         error!("load protocol extension failed: {}", err);
+                        let _ = callback.send(Err(err));
+                    }
+                }
+            },
+            ExtensionType::PropertySource => {
+                let extension = self.property_source_extension_loader.load(url);
+                match extension {
+                    Ok(mut extension) => {
+                        tokio::spawn(async move {
+                            let property_source = extension.resolve().await;
+                            match property_source {
+                                Ok(property_source) => {
+                                    let _ = callback.send(Ok(Extensions::PropertySource(property_source)));
+                                }
+                                Err(err) => {
+                                    error!("load property source extension failed: {}", err);
+                                    let _ = callback.send(Err(err));
+                                }
+                            }
+                        });
+                    }
+                    Err(err) => {
+                        error!("load property source extension failed: {}", err);
                         let _ = callback.send(Err(err));
                     }
                 }
@@ -766,6 +803,7 @@ pub(crate) enum Extensions {
     Router(Box<dyn Router + Send + Sync + 'static>),
     InvokerDirectory(Box<dyn InvokerDirectory + Send + Sync + 'static>),
     Protocol(Box<dyn Protocol + Send + Sync + 'static>),
+    PropertySource(Box<dyn PropertySource + Send + Sync + 'static>),
 }
 
 pub(crate) enum ExtensionFactories {
@@ -775,6 +813,7 @@ pub(crate) enum ExtensionFactories {
     RouterExtensionFactory(route_extension::RouterExtensionFactory),
     InvokerDirectoryExtensionFactory(invoker_directory_extension::InvokerDirectoryExtensionFactory),
     ProtocolExtensionFactory(protocol_extension::ProtocolExtensionFactory),
+    PropertySourceExtensionFactory(property_source_extension::PropertySourceExtensionFactory),
 }
 
 

@@ -7,3 +7,4 @@ pub mod load_balancer_params;
 pub mod protocol_params;
 pub mod registry_params;
 pub mod router_params;
+pub mod property_source_params;
