@@ -22,6 +22,7 @@ pub mod loadbalancer_extension;
 pub mod invoker_directory_extension;
 pub mod route_extension;
 pub mod protocol_extension;
+pub mod property_source_extension;
 
 use crate::{
     common::url::{params::extension_params::{ExtensionName, ExtensionType}, Url, UrlParam}, StdError
