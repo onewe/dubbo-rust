@@ -1,13 +1,13 @@
-use std::{collections::HashMap, pin::Pin};
+use std::{collections::HashMap, marker::PhantomData, pin::Pin};
 
 use async_trait::async_trait;
 use futures::Future;
 use thiserror::Error;
 use tokio::sync::watch;
 
-use crate::{common::url::{params::extension_params::{ExtensionName, ExtensionUrl}, Url, UrlParam}, StdError};
+use crate::{common::url::{params::extension_params::{ExtensionName, ExtensionType, ExtensionUrl}, Url, UrlParam}, StdError};
 
-use super::LoadExtensionPromise;
+use super::{Extension, ExtensionFactories, ExtensionMetaInfo, LoadExtensionPromise};
 
 
 
@@ -33,6 +33,14 @@ impl Clone for Box<dyn PropertySource + Send + Sync + 'static> {
     fn clone(&self) -> Self {
         PropertySource::clone(self.as_ref())
     }
+}
+
+
+pub fn build_property_source_url() -> Url {
+    let mut url = Url::empty();
+    url.set_protocol("property-source");
+    url.set_host("0.0.0.0");
+    url
 }
 
 
@@ -130,6 +138,28 @@ impl PropertySourceExtensionFactory {
             }
         }
 
+    }
+}
+
+
+
+pub struct PropertySourceExtension<T>(PhantomData<T>);
+
+impl<T> ExtensionMetaInfo for PropertySourceExtension<T> 
+where
+    T: Extension,
+    T: PropertySource
+{
+    fn name() -> String {
+        T::name()
+    }
+
+    fn extension_type() -> crate::common::url::params::extension_params::ExtensionType {
+        ExtensionType::PropertySource
+    }
+
+    fn extension_factory() -> super::ExtensionFactories {
+        ExtensionFactories::PropertySourceExtensionFactory(PropertySourceExtensionFactory::new(<T as Extension>::create))
     }
 }
 

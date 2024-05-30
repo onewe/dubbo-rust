@@ -1,6 +1,5 @@
 use std::str::FromStr;
-
-use crate::{common::url::UrlParam, StdError};
+use crate::{common::url::{Url, UrlParam}, StdError};
 
 pub struct PropertySourceName(String);
 
@@ -35,5 +34,44 @@ impl FromStr for PropertySourceName {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(PropertySourceName(s.to_string()))
+    }
+}
+
+
+
+
+pub struct PropertySourceUrl(Url);
+
+impl PropertySourceUrl {
+
+    pub fn new(url: Url) -> Self {
+        PropertySourceUrl(url)
+    }
+}
+
+
+impl UrlParam for PropertySourceUrl {
+
+    type TargetType = Url;
+
+    fn name() -> &'static str {
+        "property-source-url"
+    }
+
+    fn value(&self) -> Self::TargetType {
+        self.0.clone()
+    }
+
+    fn as_str(&self) -> std::borrow::Cow<str> {
+        self.0.as_str().into()
+    }
+}
+
+impl FromStr for PropertySourceUrl {
+
+    type Err = StdError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(PropertySourceUrl(Url::from_str(s)?))
     }
 }

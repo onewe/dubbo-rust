@@ -1,5 +1,5 @@
 
-#[derive(Clone, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct InvokerDirectoryConfig {
     r_type: String,
 }

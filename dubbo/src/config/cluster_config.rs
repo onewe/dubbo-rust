@@ -1,5 +1,5 @@
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct ClusterConfig {
     r_type: String,
 }

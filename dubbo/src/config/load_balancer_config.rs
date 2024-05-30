@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct LoadBalancerConfig {
     r_type: String,
 }

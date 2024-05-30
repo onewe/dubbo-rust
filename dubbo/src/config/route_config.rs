@@ -1,5 +1,5 @@
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct RouteConfig {
     r_type: String,
 }

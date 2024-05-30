@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-use crate::{common::url::UrlParam, StdError};
+use crate::{common::url::{Url, UrlParam}, StdError};
 use std::{borrow::Cow, str::FromStr};
 
 
@@ -85,5 +85,39 @@ impl FromStr for RegistryServiceName {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(Self::new(s))
+    }
+}
+
+
+pub struct RegistryUrl(Url);
+
+impl RegistryUrl {
+    pub fn new(url: Url) -> Self {
+        Self(url)
+    }
+}
+
+impl UrlParam for RegistryUrl {
+    
+    type TargetType = Url;
+
+    fn name() -> &'static str {
+        "registry-url"
+    }
+
+    fn value(&self) -> Self::TargetType {
+        self.0.clone()
+    }
+
+    fn as_str(&self) -> Cow<str> {
+        self.0.to_string().into()
+    }
+}
+
+impl FromStr for RegistryUrl {
+    type Err = StdError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self::new(s.parse()?))
     }
 }
