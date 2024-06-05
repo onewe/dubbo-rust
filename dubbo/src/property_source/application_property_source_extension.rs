@@ -114,3 +114,10 @@ impl DubboConfig {
 
     }
 }
+
+
+pub trait Properties {
+
+    fn as_map(&self) -> HashMap<String, String>;
+
+}

@@ -143,12 +143,14 @@ impl PropertySourceExtensionFactory {
 
 
 
-pub struct PropertySourceExtension<T>(PhantomData<T>);
+pub struct PropertySourceExtension<T>(PhantomData<T>)
+where
+    T: PropertySource + Send + 'static;
 
 impl<T> ExtensionMetaInfo for PropertySourceExtension<T> 
 where
-    T: Extension,
-    T: PropertySource
+    T: Extension<Target = Box<dyn PropertySource + Send + Sync + 'static>>,
+    T: PropertySource + Send + 'static
 {
     fn name() -> String {
         T::name()
