@@ -37,7 +37,7 @@ impl PropertySource for ApplicationPropertySourceExtension {
         self.properties.get(key).cloned()
     }
 
-    async fn watch(&mut self, _: &str) -> Result<watch::Receiver<String>, StdError> {
+    async fn watch(&self, _: &str) -> Result<watch::Receiver<String>, StdError> {
         Err(ApplicationPropertySourceError::new("ApplicationPropertySourceExtension does not support watch").into())
     }
 

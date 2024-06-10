@@ -18,7 +18,7 @@ pub trait PropertySource {
 
     async fn get_property(&self, key: &str) -> Option<String>;
 
-    async fn watch(&mut self, key: &str) -> Result<watch::Receiver<String>, StdError>;
+    async fn properties(&self) -> &HashMap<String, String>;
 
     async fn ready(&mut self) -> Result<(), StdError>;
 
@@ -33,6 +33,20 @@ impl Clone for Box<dyn PropertySource + Send + Sync + 'static> {
     fn clone(&self) -> Self {
         PropertySource::clone(self.as_ref())
     }
+}
+
+
+pub trait ConfigProperty {
+    
+    type Target;
+    
+    fn create(value: Self::Target) -> Self;
+
+    fn create_from_map(map: &HashMap<String, String>) -> Option<Self> where Self: Sized;
+
+    fn value(&self) -> Self::Target;
+
+    fn into_map(self) -> HashMap<String, String>;
 }
 
 

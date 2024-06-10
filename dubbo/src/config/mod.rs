@@ -15,6 +15,8 @@
  * limitations under the License.
  */
 
+use std::collections::HashMap;
+
 use cluster_config::ClusterConfig;
 use invoker_directory_config::InvokerDirectoryConfig;
 use load_balancer_config::LoadBalancerConfig;
@@ -40,6 +42,7 @@ pub struct DubboConfig {
     pub(crate) property_source_config: PropertySourceConfig,
     pub(crate) registry_config: RegistryConfig,
     pub(crate) route_config: RouteConfig,
+    proeprties: HashMap<String, String>,
 }
 
 
@@ -89,3 +92,25 @@ impl DubboConfig {
         }
     }
 }
+
+
+pub trait Configuration {
+
+    fn property(&self, key: &str) -> Option<&String>;
+
+    fn properties(&self) -> HashMap<String, String>;   
+}
+
+
+impl Configuration for DubboConfig {
+
+    fn property(&self, key: &str) -> Option<&String> {
+        self.proeprties.get(key)
+    }
+
+    fn properties(&self) -> HashMap<String, String> {
+        self.proeprties.clone()
+    }
+}
+
+

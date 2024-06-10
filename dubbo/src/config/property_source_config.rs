@@ -1,34 +1,44 @@
-use crate::common::url::Url;
 
-#[derive(Debug, Clone)]
+
+use std::collections::HashMap;
+
+use crate::{common::url::Url, extension::property_source_extension::ConfigProperty};
+
+#[derive(Debug, Clone, Default)]
 pub struct PropertySourceConfig {
-    url: Url,
+    properties: HashMap<String, String>,
+
 }
 
 
-impl PropertySourceConfig {
-    pub fn new(url: Url) -> Self {
-        PropertySourceConfig {
-            url,
-        }
-    }
+
+
+pub struct PropertySourceUrls(Vec<Url>);
+
+
+impl PropertySourceUrls {
+
+    const KEY: &'static str = "dubbo.config.sources.urls";
 }
 
-impl PropertySourceConfig {
 
-    pub fn url(&self) -> &Url {
-        &self.url
+impl ConfigProperty for PropertySourceUrls {
+    
+    type Target = Vec<Url>;
+
+    fn create(value: Self::Target) -> Self {
+        PropertySourceUrls(value)
     }
 
-    pub fn url_mut(&mut self) -> &mut Url {
-        &mut self.url
+    fn create_from_map(map: &HashMap<String, String>) -> Option<Self> where Self: Sized {
+        todo!()
     }
-}
 
-impl Default for PropertySourceConfig {
-    fn default() -> Self {
-        PropertySourceConfig {
-            url: Url::empty(),
-        }
+    fn value(&self) -> Self::Target {
+        todo!()
+    }
+
+    fn into_map(self) -> HashMap<String, String> {
+        todo!()
     }
 }
